@@ -109,6 +109,15 @@ namespace EndpointSystems.BizTalk.Documentation
      {
          try
          {
+             if (null == ti)
+             {
+                 return new XElement(xmlns + "section",
+                                                   new XElement(xmlns + "title", new XText(title)),
+                                                   new XElement(xmlns + "content",
+                                                                new XElement(xmlns + "para",
+                                                                             new XText(
+                                                                                 "Transport information unavailable for this artifact."))));                 
+             }
              bool nullTrans = null == ti.TransportType;             
              XElement transport = new XElement(xmlns + "section",
                      new XElement(xmlns + "title", new XText(title)),

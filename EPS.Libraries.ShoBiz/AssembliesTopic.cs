@@ -61,18 +61,16 @@ namespace EndpointSystems.BizTalk.Documentation
                                                    string.Format(
                                                        "This section contains information about the assemblies used in the {0} application.",
                                                        appName)))));
-            XElement thisSection = new XElement(xmlns + "inThisSection");
             List<XElement> elems =
                 new List<XElement>(CatalogExplorerFactory.CatalogExplorer().Applications[appName].Assemblies.Count);
 
             foreach (BtsAssembly assy in CatalogExplorerFactory.CatalogExplorer().Applications[appName].Assemblies)
             {
                 assemblyTopics.Add(new AssemblyTopic(appName, assy.Name, path));
-                elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "topic", new XText(CleanAndPrep(assy.DisplayName)))));
+                elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "topic", new XText(CleanAndPrep(appName + ".Assemblies." + assy.Name)))));
             }
 
-            thisSection.Add(new XElement(xmlns + "para", new XText("This application contains the following assemblies:")),
-                            elems.ToArray());
+            XElement thisSection = new XElement(xmlns + "inThisSection", new XText("This application contains the following assemblies:"),elems.ToArray());
             root.Add(thisSection);
             if (doc.Root != null) doc.Root.Add(root);
         }

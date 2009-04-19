@@ -51,6 +51,7 @@ namespace EndpointSystems.BizTalk.Documentation
             buildTree();
             tokenId = CleanAndPrep(btsAppName);
             TimerStart();
+            TokenFile.GetTokenFile().AddTopicToken(CleanAndPrep(tokenId), id);
             appWorker = new BackgroundWorker();
             appWorker.DoWork += appWorker_DoWork;
             appWorker.RunWorkerCompleted += appWorker_RunWorkerCompleted;
@@ -132,26 +133,29 @@ namespace EndpointSystems.BizTalk.Documentation
 
         private void appWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            Application app = CatalogExplorerFactory.CatalogExplorer().Applications[appName];
+            BtsCatalogExplorer bce = new BtsCatalogExplorer();
+            bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+            Application app = bce.Applications[appName];
             XElement root = CreateDeveloperOrientationElement();
             XElement intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText(string.IsNullOrEmpty(app.Description) ? "No description was given." : app.Description)));
             XElement inThis = new XElement(xmlns + "inThisSection", new XText("This application contains the BizTalk artifacts listed below."));
-
             #region orchestrations
             try
             {
-                TokenFile.GetTokenFile().AddTopicToken(CleanAndPrep(tokenId), id);
-                PrintLine("{0} has {1} orchestrations",appName, app.Orchestrations.Count);
-                if (app.Orchestrations.Count > 0)
+                if (null != app.Orchestrations)
                 {
-                    inThis.Add(new XElement(xmlns + "para",new XElement(xmlns + "legacyBold", new XText("Orchestrations:"))));
-                    foreach (BtsOrchestration orch in app.Orchestrations)
+                    PrintLine("{0} has {1} orchestrations", appName, app.Orchestrations.Count);
+                    if (app.Orchestrations.Count > 0)
                     {
-                        inThis.Add(new XElement(xmlns + "para",
-                                                new XElement(xmlns + "token",
-                                                             new XText(CleanAndPrep(appName + ".Orchestrations." + orch.FullName)))));
+                        inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Orchestrations:"))));
+                        foreach (BtsOrchestration orch in app.Orchestrations)
+                        {
+                            inThis.Add(new XElement(xmlns + "para",
+                                                    new XElement(xmlns + "token",
+                                                                 new XText(CleanAndPrep(appName + ".Orchestrations." + orch.FullName)))));
+                        }
+                        orchsTopic = new OrchestrationsTopic(path + @"Orchestrations\", imgPath, appName);
                     }
-                    orchsTopic = new OrchestrationsTopic(path + @"Orchestrations\", imgPath, appName);
                 }
             }
             catch(Exception ex)
@@ -164,18 +168,21 @@ namespace EndpointSystems.BizTalk.Documentation
 
             try
             {
-                PrintLine("send ports count: {0}", app.SendPorts.Count);
-                if (app.SendPorts.Count > 0)
+                if (app.SendPorts != null)
                 {
-                    inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Send Ports:"))));
-                    foreach (SendPort port in app.SendPorts)
+                    PrintLine("send ports count: {0}", app.SendPorts.Count);
+                    if (app.SendPorts.Count > 0)
                     {
-                        inThis.Add(new XElement(xmlns + "para",
-                                                new XElement(xmlns + "token",
-                                                             new XText(CleanAndPrep(appName + ".SendPorts." + port.Name)))));
-                    }
+                        inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Send Ports:"))));
+                        foreach (SendPort port in app.SendPorts)
+                        {
+                            inThis.Add(new XElement(xmlns + "para",
+                                                    new XElement(xmlns + "token",
+                                                                 new XText(CleanAndPrep(appName + ".SendPorts." + port.Name)))));
+                        }
 
-                    spsTopic = new SendPortsTopic(appName, path + @"Send Ports\");
+                        spsTopic = new SendPortsTopic(appName, path + @"Send Ports\");
+                    }
                 }
             }
             catch(Exception ex)
@@ -186,41 +193,43 @@ namespace EndpointSystems.BizTalk.Documentation
             #endregion
 
             #region receive ports
-
-            if (app.ReceivePorts.Count > 0)
+            if (app.ReceivePorts != null)
             {
-                PrintLine("{0} has {1} receive ports",appName, app.ReceivePorts.Count);
-                XElement rlElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Locations:")));
-                List<XElement> recLocs = new List<XElement>();
-
-                XElement rpElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Ports:")));
-                foreach (ReceivePort port in app.ReceivePorts)
+                if (app.ReceivePorts.Count > 0)
                 {
-                    PrintLine("{0} has {1} receive locations");
-                    rpElement.Add(new XElement(xmlns + "para",
-                                            new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".ReceivePorts." + port.Name)))));
-                    if (port.ReceiveLocations.Count > 0)
+                    PrintLine("{0} has {1} receive ports", appName, app.ReceivePorts.Count);
+                    XElement rlElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Locations:")));
+                    List<XElement> recLocs = new List<XElement>();
+
+                    XElement rpElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Ports:")));
+                    foreach (ReceivePort port in app.ReceivePorts)
                     {
-                        foreach (ReceiveLocation rl in port.ReceiveLocations)
+                        PrintLine("{0} has {1} receive locations");
+                        rpElement.Add(new XElement(xmlns + "para",
+                                                new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".ReceivePorts." + port.Name)))));
+                        if (port.ReceiveLocations.Count > 0)
                         {
-                            recLocs.Add(new XElement(xmlns + "para",
-                                                     new XElement(xmlns + "token",
-                                                                  new XText(CleanAndPrep(appName + ".ReceiveLocations." + rl.ReceivePort.Name + rl.Name)))));
+                            foreach (ReceiveLocation rl in port.ReceiveLocations)
+                            {
+                                recLocs.Add(new XElement(xmlns + "para",
+                                                         new XElement(xmlns + "token",
+                                                                      new XText(CleanAndPrep(appName + ".ReceiveLocations." + rl.ReceivePort.Name + rl.Name)))));
+                            }
+                            if (null == rlsTopic)
+                            {
+                                rlsTopic = new ReceiveLocationsTopic(appName, path + @"Receive Locations\");
+                            }
                         }
-                        if (null == rlsTopic)
-                        {
-                            rlsTopic = new ReceiveLocationsTopic(appName, path + @"Receive Locations\");
-                        }
+                        rpsTopic = new ReceivePortsTopic(appName, path + @"Receive Ports\");
                     }
-                    rpsTopic = new ReceivePortsTopic(appName, path + @"Receive Ports\");
-                }
 
-                inThis.Add(rpElement);
+                    inThis.Add(rpElement);
 
-                if (recLocs.Count > 0)
-                {
-                    rlElement.Add(recLocs.ToArray());
-                    inThis.Add(rlElement);
+                    if (recLocs.Count > 0)
+                    {
+                        rlElement.Add(recLocs.ToArray());
+                        inThis.Add(rlElement);
+                    }
                 }
             }
 
@@ -228,85 +237,96 @@ namespace EndpointSystems.BizTalk.Documentation
 
             #region policies
 
-            if (app.Policies.Count > 0)
+            if (null != app.Policies)
             {
-                PrintLine("{0} has {1} policies",appName,app.Policies.Count);
-                bsTopic = new BusinessRulesTopic(appName,path + @"Policies\",rulesDb);
-                inThis.Add(new XElement(xmlns + "legacyBold", new XText("Policies:")));
-                foreach (Policy policy in app.Policies)
+                if (app.Policies.Count > 0)
                 {
-                    inThis.Add(new XElement(xmlns + "para",
-                                            new XElement(xmlns + "token",
-                                                         new XText(
-                                                             CleanAndPrep(appName + ".Policies." + policy.Name )))));
-                }
+                    PrintLine("{0} has {1} policies", appName, app.Policies.Count);
+                    bsTopic = new BusinessRulesTopic(appName, path + @"Policies\", rulesDb);
+                    inThis.Add(new XElement(xmlns + "legacyBold", new XText("Policies:")));
+                    foreach (Policy policy in app.Policies)
+                    {
+                        inThis.Add(new XElement(xmlns + "para",
+                                                new XElement(xmlns + "token",
+                                                             new XText(
+                                                                 CleanAndPrep(appName + ".Policies." + policy.Name)))));
+                    }
 
+                }
             }
 
             #endregion
 
             #region schemas
-
-            if (app.Schemas.Count > 0)
+            if (null != app.Schemas)
             {
-                PrintLine("{0} has {1} schemas",appName,app.Schemas.Count);
-                schTopic = new SchemasTopic(appName, path + @"Schemas\");
-                inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Schemas:"))));
-                
-                foreach (Schema schema in app.Schemas)
+                if (app.Schemas.Count > 0)
                 {
-                    inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Schemas." + schema.FullName)))));
+                    PrintLine("{0} has {1} schemas", appName, app.Schemas.Count);
+                    schTopic = new SchemasTopic(appName, path + @"Schemas\");
+                    inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Schemas:"))));
+
+                    foreach (Schema schema in app.Schemas)
+                    {
+                        inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Schemas." + schema.FullName)))));
+                    }
                 }
             }
 
             #endregion
 
             #region transforms
-
-            if (app.Transforms.Count > 0)
+            if (null != app.Transforms)
             {
-                PrintLine("{0} has {1} transforms",appName,app.Transforms.Count);
-                inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Transforms:"))));
-                foreach (Transform transform in app.Transforms)
+                if (app.Transforms.Count > 0)
                 {
-                    inThis.Add(new XElement(xmlns + "para",
-                                            new XElement(xmlns + "token",
-                                                         new XText(CleanAndPrep(appName + ".Transforms." + transform.FullName)))));
+                    PrintLine("{0} has {1} transforms", appName, app.Transforms.Count);
+                    inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Transforms:"))));
+                    foreach (Transform transform in app.Transforms)
+                    {
+                        inThis.Add(new XElement(xmlns + "para",
+                                                new XElement(xmlns + "token",
+                                                             new XText(CleanAndPrep(appName + ".Transforms." + transform.FullName)))));
+                    }
+
+                    transTopic = new TransformsTopic(appName, path + @"Maps\");
                 }
-
-                transTopic = new TransformsTopic(appName,path + @"Maps\");
+                
             }
-
             #endregion
 
             #region pipelines
-            PrintLine("{0} has {1} pipelines",appName, app.Pipelines.Count);
-            if (app.Pipelines.Count > 0)
+            if (null != app.Pipelines)
             {
-                inThis.Add(new XElement(xmlns + "para", new XText("Pipelines:")));
-                foreach (Pipeline pipeline in app.Pipelines)
+                PrintLine("{0} has {1} pipelines", appName, app.Pipelines.Count);
+                if (app.Pipelines.Count > 0)
                 {
-                    inThis.Add(new XElement(xmlns + "para",
-                                            new XElement(xmlns + "token",
-                                                         new XText(CleanAndPrep(appName + ".Pipelines." + pipeline.FullName)))));
+                    inThis.Add(new XElement(xmlns + "para", new XText("Pipelines:")));
+                    foreach (Pipeline pipeline in app.Pipelines)
+                    {
+                        inThis.Add(new XElement(xmlns + "para",
+                                                new XElement(xmlns + "token",
+                                                             new XText(CleanAndPrep(appName + ".Pipelines." + pipeline.FullName)))));
+                    }
                 }
             }
 
             #endregion
 
             #region assemblies
-
-            if (app.Assemblies.Count > 0)
+            if (null != app.Assemblies)
             {
-                PrintLine("{0} has {1} assemblies", appName, app.Assemblies.Count);
-                assyTopic = new AssembliesTopic(path + @"Resources\", appName);
-                inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Resources:"))));
-                foreach (BtsAssembly assembly in app.Assemblies)
+                if (app.Assemblies.Count > 0)
                 {
-                    inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Assemblies." + assembly.DisplayName)))));
+                    PrintLine("{0} has {1} assemblies", appName, app.Assemblies.Count);
+                    assyTopic = new AssembliesTopic(path + @"Resources\", appName);
+                    inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Resources:"))));
+                    foreach (BtsAssembly assembly in app.Assemblies)
+                    {
+                        inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Assemblies." + assembly.Name)))));
+                    }
                 }
             }
-
             #endregion
 
             root.Add(intro, inThis);

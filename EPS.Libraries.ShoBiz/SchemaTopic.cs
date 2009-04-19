@@ -57,7 +57,7 @@ namespace EndpointSystems.BizTalk.Documentation
             {
                 bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
                 Schema s = bce.Applications[appName].Schemas[schemaName];
-                schemaTitle = schemaName + "#" + s.RootName;
+                schemaTitle = s.RootName == null ? schemaName : schemaName + "#" + s.RootName;
                 sb.Append(
                     "<?xml version=\"1.0\" encoding=\"utf-8\"?><topic id=\"" + id + "\" revisionNumber=\"1\">");
                 root = CreateDeveloperXmlReference();
@@ -75,7 +75,7 @@ namespace EndpointSystems.BizTalk.Documentation
                                                                                 new XElement(xmlns + "entry", new XElement(xmlns + "token", new XText(CleanAndPrep(s.Application.Name))))),
                                                                             new XElement(xmlns + "row",
                                                                                 new XElement(xmlns + "entry", new XText("Always Track All Properties")),
-                                                                                new XElement(xmlns + "entry", new XText(s.AlwaysTrackAllProperties.ToString()))),
+                                                                                new XElement(xmlns + "entry", new XText(s.Type == SchemaType.Property ? "does not apply to property schemas." : s.AlwaysTrackAllProperties.ToString()))),
                                                                             new XElement(xmlns + "row",
                                                                                 new XElement(xmlns + "entry", new XText("Assembly Qualified Name")),
                                                                                 new XElement(xmlns + "entry", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Assemblies." + s.BtsAssembly.DisplayName))))),
@@ -84,7 +84,7 @@ namespace EndpointSystems.BizTalk.Documentation
                                                                                 new XElement(xmlns + "entry", s.Properties.Count > 0 ? DictionaryToTable(s.Properties,"Property Name", "Property Type") : new XElement(xmlns + "legacyItalic", new XText("(N/A)")))),
                                                                             new XElement(xmlns + "row",
                                                                                 new XElement(xmlns + "entry", new XText("Root Name")),
-                                                                                new XElement(xmlns + "entry", new XText(s.RootName))),
+                                                                                new XElement(xmlns + "entry", new XText(s.RootName ?? "(None)" ))),
                                                                             new XElement(xmlns + "row",
                                                                                 new XElement(xmlns + "entry", new XText("Target Namespace")),
                                                                                 new XElement(xmlns + "entry", new XText(s.TargetNameSpace ?? "N/A"))),
@@ -96,11 +96,15 @@ namespace EndpointSystems.BizTalk.Documentation
                                                                                 new XElement(xmlns + "entry", new XText(s.Type.ToString()))))));
 
                 XElement content = new XElement(xmlns + "codeExample", new XElement(xmlns + "code",new XAttribute("language","xml"), new XText(s.XmlContent)));
-
+                
                 root.Add(intro,section,content);
                 sb.Append(root.ToString(SaveOptions.None));
                 sb.Append("</topic>");
             }
+                catch(Exception ex)
+                {
+                    HandleException("SchemaTopic.DoWork", ex);
+                }
             finally
             {
                 bce.Dispose();

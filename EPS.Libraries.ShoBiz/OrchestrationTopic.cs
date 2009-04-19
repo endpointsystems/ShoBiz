@@ -70,7 +70,7 @@ namespace EndpointSystems.BizTalk.Documentation
                 do
                 {
                     Trace.WriteLine("waiting to finish saving orchetration image for " + orchName + "...");
-                    Thread.Sleep(100);
+                    Thread.Sleep(1000);
                 } while (Equals(t.ThreadState, ThreadState.Running) || Equals(t.ThreadState, ThreadState.WaitSleepJoin));
 
                 XElement orchSection = new XElement(xmlns + "section");

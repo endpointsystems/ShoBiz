@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Xml.Linq;
 using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
@@ -15,7 +15,6 @@ namespace EndpointSystems.BizTalk.Documentation
     {
         private readonly string assyName;
         private readonly BackgroundWorker assyWorker;
-        private readonly Stopwatch sw;
         private string displayName;
         public AssemblyTopic(string btsAppName, string btsAssemblyName, string basePath)
         {
@@ -54,7 +53,7 @@ namespace EndpointSystems.BizTalk.Documentation
                 bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
             //get the object
             BtsAssembly assy = bce.Assemblies[assyName];
-            displayName = assy.DisplayName;
+            displayName = assy.Name;
             XElement root = CreateDeveloperConceptualElement();
 
             //build the document structure
@@ -89,15 +88,18 @@ namespace EndpointSystems.BizTalk.Documentation
 
             #endregion
 
+            List<XElement> elems = new List<XElement>();
+
             #region list orchestrations
 
             if (assy.Orchestrations.Count > 0)
             {
-                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"));
                 foreach (BtsOrchestration orchestration in assy.Orchestrations)
                 {
-                    list.Add(xmlns + "listItem", new XElement(xmlns + "token", CleanAndPrep(appName + ".Orchestrations." +  orchestration.FullName)));
+                    elems.Add(new XElement(xmlns + "listItem", new XElement(xmlns + "token", CleanAndPrep(appName + ".Orchestrations." +  orchestration.FullName))));
                 }
+                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"),elems.ToArray());
+
                 root.Add(new XElement(xmlns + "section",
                                       new XElement(xmlns + "title", new XText("Orchestrations")),
                                       new XElement(xmlns + "content",
@@ -113,12 +115,13 @@ namespace EndpointSystems.BizTalk.Documentation
 
             if (assy.Pipelines != null && assy.Pipelines.Count > 0)
             {
-                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"));
+                elems.Clear();
                 foreach (Pipeline pipeline in assy.Pipelines)
                 {
-                    list.Add(new XElement(xmlns + "listItem",
+                    elems.Add(new XElement(xmlns + "listItem",
                                           new XElement(xmlns + "token", CleanAndPrep(pipeline.AssemblyQualifiedName))));
                 }
+                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"),elems.ToArray());
                 root.Add(AddListSection("Pipelines", "This assembly defines the following pipelines:", list));
             }
 
@@ -143,12 +146,13 @@ namespace EndpointSystems.BizTalk.Documentation
 
             if (assy.Schemas != null && assy.Schemas.Count > 0)
             {
-                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"));
+                elems.Clear();
                 foreach (Schema schema  in assy.Schemas)
                 {
-                    list.Add(new XElement(xmlns + "listItem", new XElement(xmlns + "token", CleanAndPrep(appName + ".Schemas." + schema.FullName))));
+                    elems.Add(new XElement(xmlns + "listItem", new XElement(xmlns + "token", CleanAndPrep(appName + ".Schemas." + schema.FullName))));
                 }
 
+                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"),elems.ToArray());
                 root.Add(AddListSection("Schemas", "This assembly contains the following schemas:", list));
             }
 
@@ -158,12 +162,12 @@ namespace EndpointSystems.BizTalk.Documentation
 
             if (assy.Transforms != null && assy.Transforms.Count > 0)
             {
-                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"));
                 foreach (Transform trans in assy.Transforms)
                 {
-                    list.Add(new XElement(xmlns + "listItem", new XElement(xmlns + "token", CleanAndPrep(appName + ".Transforms." + trans.FullName))));
+                    elems.Add(new XElement(xmlns + "listItem", new XElement(xmlns + "token", CleanAndPrep(appName + ".Transforms." + trans.FullName))));
                 }
 
+                XElement list = new XElement(xmlns + "list", new XAttribute("class", "bullet"),elems.ToArray());
                 root.Add(AddListSection("Transforms", "This assembly contains the following maps:", list));
             }
 

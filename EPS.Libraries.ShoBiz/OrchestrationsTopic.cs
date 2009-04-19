@@ -57,7 +57,7 @@ namespace EndpointSystems.BizTalk.Documentation
             {
                 do
                 {
-                    Thread.Sleep(100);
+                    Thread.Sleep(2000);
                 } while (topic.ReadyToSave == false);
             }
             lock(this)
@@ -94,6 +94,7 @@ namespace EndpointSystems.BizTalk.Documentation
                 {
                     topics.Add(new OrchestrationTopic(path, imagesPath, appName, orch.FullName));
                     elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(string.Format("{0}.Orchestrations.{1}",appName,orch.FullName))))));
+                    Thread.Sleep(5000);
                 }
 
                 thisSection.Add(new XText("This application contains the following orchestrations:"),
