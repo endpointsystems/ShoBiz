@@ -266,6 +266,7 @@ namespace EndpointSystems.BizTalk.Documentation
                     string bmpPath = imgPath + orn + ".jpg";
 
                     BtsOrch o = new BtsOrch(appName, orchName);
+
                     using (ODViewCtrl odv = new ODViewCtrl())
                     {
                         odv.AllowDrop = false;
