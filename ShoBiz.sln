@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 9.00
-# Visual Studio 2005
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EndpointSystems.BizTalk.ShoBiz", "EPS.Libraries.ShoBiz\EndpointSystems.BizTalk.ShoBiz.csproj", "{4810A887-CD39-4472-A9DB-C88DAEE77EF9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShoBiz.Test", "ShoBiz.Test\ShoBiz.Test.csproj", "{F37A916E-E3A5-4AA0-8A0A-D94796C33CBE}"

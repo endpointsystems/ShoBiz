@@ -43,6 +43,7 @@ namespace ShoBizUI
             this.btnConnect = new System.Windows.Forms.Button();
             this.ckSelect = new System.Windows.Forms.CheckBox();
             this.btnBuild = new System.Windows.Forms.Button();
+            this.btnConnectString = new System.Windows.Forms.Button();
             this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -67,14 +68,14 @@ namespace ShoBizUI
             this.lblStatus});
             this.statusStrip1.Location = new System.Drawing.Point(0, 356);
             this.statusStrip1.Name = "statusStrip1";
-            this.statusStrip1.Size = new System.Drawing.Size(521, 22);
+            this.statusStrip1.Size = new System.Drawing.Size(546, 22);
             this.statusStrip1.TabIndex = 3;
             this.statusStrip1.Text = "statusStrip1";
             // 
             // lblStatus
             // 
             this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(348, 17);
+            this.lblStatus.Size = new System.Drawing.Size(384, 17);
             this.lblStatus.Text = "Press the \'Connect\' button to connect to your Biztalk connection string.";
             // 
             // fdProjectPath
@@ -85,7 +86,7 @@ namespace ShoBizUI
             // 
             // btnBaseDir
             // 
-            this.btnBaseDir.Location = new System.Drawing.Point(422, 69);
+            this.btnBaseDir.Location = new System.Drawing.Point(442, 69);
             this.btnBaseDir.Name = "btnBaseDir";
             this.btnBaseDir.Size = new System.Drawing.Size(75, 23);
             this.btnBaseDir.TabIndex = 4;
@@ -146,7 +147,7 @@ namespace ShoBizUI
             // 
             // btnConnect
             // 
-            this.btnConnect.Location = new System.Drawing.Point(422, 12);
+            this.btnConnect.Location = new System.Drawing.Point(442, 12);
             this.btnConnect.Name = "btnConnect";
             this.btnConnect.Size = new System.Drawing.Size(75, 23);
             this.btnConnect.TabIndex = 1;
@@ -175,11 +176,22 @@ namespace ShoBizUI
             this.btnBuild.UseVisualStyleBackColor = true;
             this.btnBuild.Click += new System.EventHandler(this.btnBuild_Click);
             // 
+            // btnConnectString
+            // 
+            this.btnConnectString.Location = new System.Drawing.Point(411, 12);
+            this.btnConnectString.Name = "btnConnectString";
+            this.btnConnectString.Size = new System.Drawing.Size(25, 23);
+            this.btnConnectString.TabIndex = 9;
+            this.btnConnectString.Text = "...";
+            this.btnConnectString.UseVisualStyleBackColor = true;
+            this.btnConnectString.Click += new System.EventHandler(this.btnConnectString_Click);
+            // 
             // frmMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(521, 378);
+            this.ClientSize = new System.Drawing.Size(546, 378);
+            this.Controls.Add(this.btnConnectString);
             this.Controls.Add(this.btnBuild);
             this.Controls.Add(this.ckSelect);
             this.Controls.Add(this.btnConnect);
@@ -221,6 +233,7 @@ namespace ShoBizUI
         private System.Windows.Forms.Button btnConnect;
         private System.Windows.Forms.CheckBox ckSelect;
         private System.Windows.Forms.Button btnBuild;
+        private System.Windows.Forms.Button btnConnectString;
     }
 }
 

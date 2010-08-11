@@ -1,17 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using EndpointSystems.BizTalk.Documentation;
 using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
 using Application=Microsoft.BizTalk.ExplorerOM.Application;
+using ADODB;
+using MSDASC;
 
 namespace ShoBizUI
 {
     public partial class frmMain : Form
     {
+        private const string MULTI = ";MultipleActiveResultSets=True";
         delegate void BuildDelegate();
 
         private readonly BtsCatalogExplorer bce;
@@ -47,7 +51,7 @@ namespace ShoBizUI
             catch (Exception ex)
             {
                 HandleException("Connect",ex);
-                throw;
+                
             }        
             finally
             {
@@ -95,22 +99,26 @@ namespace ShoBizUI
 
         private void BuildApps()
         {
-            List<string> apps = new List<string>();
+            var apps = new List<string>();
             try
             {
                 status("Building documentation, please wait...");
                 
+                //build the directory path, if it doesn't exist
+                if (!Directory.Exists(tbBaseFolder.Text))
+                    Directory.CreateDirectory(tbBaseFolder.Text);
+
                 foreach (int i in lbApps.SelectedIndices)
                 {
                     apps.Add(lbApps.Items[i] as string);
                 }
 
                 //the trailing character is important
-                string s = tbBaseFolder.Text.Trim() + @"\";
+                var s = tbBaseFolder.Text.Trim() + @"\";
 
                 CatalogExplorerFactory.CatalogExplorer(tbConnectionString.Text.Trim(), true);
 
-                AppsTopic at = new AppsTopic(s, s + @"images\", apps, tbRules.Text);
+                var at = new AppsTopic(s, s + @"images\", apps, tbRules.Text);
                 do
                 {
                     Thread.Sleep(100);
@@ -127,13 +135,13 @@ namespace ShoBizUI
         }
         
         private void status(string text)
-        {
+        {            
             lblStatus.Text = text;
         }
 
         private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
         {
-            Configuration c = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            var c = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
             c.AppSettings.Settings["connectionString"].Value = tbConnectionString.Text.Trim();
             c.AppSettings.Settings["rulesDatabase"].Value = tbRules.Text.Trim();
             c.AppSettings.Settings["baseDirectory"].Value = tbBaseFolder.Text.Trim();
@@ -151,6 +159,21 @@ namespace ShoBizUI
         {
             if (lbApps.SelectedIndices.Count > 0)
                 lblStatus.Text = lbApps.SelectedIndices.Count > 0 ? "Press the 'Build Documentation' button when you are ready." : "Select the application(s) you wish to document.";
+        }
+
+        private void btnConnectString_Click(object sender, EventArgs e)
+        {
+            var dlDlg = new DataLinksClass();
+            _Connection con = null;
+
+            con = (_Connection)dlDlg.PromptNew();
+            if (con != null)
+            {
+                var str = con.ConnectionString;
+                if (!str.Contains(MULTI)) str = str + MULTI;
+                tbConnectionString.Text = str;
+            }
+
         }
     }
 }
