@@ -1,70 +1,39 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Threading;
-using EndpointSystems.OrchestrationLibrary;
-using Microsoft.BizTalk.ExplorerOM;
+using System.Threading.Tasks;
 using System.Xml.Linq;
-using Policy=Microsoft.BizTalk.ExplorerOM.Policy;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
-    public class BusinessRulesTopic: TopicFile, IDisposable
+    class BusinessRulesTopic: TopicFile
     {
-        private readonly BackgroundWorker brWorker;
         private readonly List<BusinessRuleTopic> topics;
-        private readonly string rulesDb;
-        public BusinessRulesTopic(string btsAppName, string baseDir, string btsRulesDatabase)
+        private readonly string[] policies;
+
+        public BusinessRulesTopic(string btsAppName, string baseDir, string[] rules)
         {
-            brWorker = new BackgroundWorker();
+            policies = rules;
             appName = btsAppName;
-            path = baseDir;
+            topicRelativePath = baseDir;
             topics = new List<BusinessRuleTopic>();
-            rulesDb = btsRulesDatabase;
             tokenId = appName + ".BusinessRules";
-            TimerStart();
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
-            brWorker.DoWork += brWorker_DoWork;
-            brWorker.RunWorkerCompleted += brWorker_RunWorkerCompleted;
-            brWorker.RunWorkerAsync();
         }
 
-        void brWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        void SaveTopic()
         {
-            if (topics.Count > 0)
-            {
-                foreach (BusinessRuleTopic topic in topics)
-                {
-                    do
-                    {
-                        Thread.Sleep(100);
-                    } while (!topic.ReadyToSave);
-                }
-            }
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        void brWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
             try
             {
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
-                XElement root = CreateDeveloperOrientationElement();
+                var root = CreateDeveloperOrientationElement();
 
-                XElement intro = new XElement(xmlns + "introduction", 
+                var intro = new XElement(xmlns + "introduction", 
                     new XText("This section documents the business rule policies for the "), 
                     new XElement(xmlns + "token",new XText(CleanAndPrep(appName))),
                     new XText(" application."));
 
-                List<XElement> paras = new List<XElement>();
-                PolicyCollection pc = bce.Applications[appName].Policies;
+                var paras = new List<XElement>();
                 
-                if (pc == null)
+                if (policies == null)
                 {
                     intro = new XElement(xmlns + "introduction",
                         new XText("This application contains no policies."));
@@ -74,13 +43,13 @@ namespace EndpointSystems.BizTalk.Documentation
                     return;
                 }
 
-                foreach (Policy policy in pc)
+                foreach (var policy in policies)
                 {
-                    paras.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Policies." + policy.Name)))));
-                    topics.Add(new BusinessRuleTopic(appName,path,policy.Name,rulesDb));
+                    paras.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Policies." + policy)))));
+                    topics.Add(new BusinessRuleTopic(appName,topicRelativePath,policy));
                 }
 
-                XElement inThis = new XElement(xmlns + "inThisSection",
+                var inThis = new XElement(xmlns + "inThisSection",
                     new XText("This application contains the following policies:"),paras.ToArray());
                 
                 root.Add(intro, inThis);
@@ -90,21 +59,17 @@ namespace EndpointSystems.BizTalk.Documentation
             {
                 HandleException("BusinessRulesTopic.DoWork",ex);
             }
-            finally
-            {
-                bce.Dispose();
-            }            
         }
 
         public XElement GetContentLayout()
         {
-            List<XElement> t = new List<XElement>();
-            foreach (BusinessRuleTopic topic in topics)
+            var t = new List<XElement>();
+            foreach (var topic in topics)
             {
                 t.Add(topic.GetContentLayout());
             }
 
-            XElement xe = new XElement("Topic",
+            var xe = new XElement("Topic",
                                 new XAttribute("id", id),
                                 new XAttribute("visible", "true"),
                                 new XAttribute("title", "Policies"));
@@ -113,26 +78,17 @@ namespace EndpointSystems.BizTalk.Documentation
             return xe;
         }
 
-        public void Dispose()
+        public override void Save()
         {
-            brWorker.Dispose();
-            foreach (BusinessRuleTopic topic in topics)
+            TimerStart();
+            SaveTopic();
+            foreach (var topic in topics)
             {
-                topic.Dispose();
-            }
-        }
-
-        public new void Save()
-        {
-            base.Save();
-            foreach (BusinessRuleTopic topic in topics)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
                 topic.Save();
             }
+            //loopResult = Parallel.ForEach(topics, SaveAllTopics);
+            base.Save();
+            TimerStop();
         }
     }
 }

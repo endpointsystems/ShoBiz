@@ -1,99 +1,66 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Threading;
 using System.Xml.Linq;
-using EndpointSystems.OrchestrationLibrary;
-using Microsoft.BizTalk.ExplorerOM;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
-    class SchemasTopic: TopicFile, IDisposable
+    class SchemasTopic: TopicFile
     {
-        private readonly BackgroundWorker schsWorker;
         private readonly List<SchemaTopic> topics;
         private XElement root;
-        public SchemasTopic(string btsAppName, string basePath)
+        private readonly string[] schemas;
+        
+        /// <summary>
+        /// Create a new Sandcastle schemas topic.
+        /// </summary>
+        /// <param name="btsAppName">The BizTalk application name.</param>
+        /// <param name="topicPath">The path to save the topic in.</param>
+        /// <param name="schemaNames">A list of the full names of schemas to generate.</param>
+        public SchemasTopic(string btsAppName, string topicPath, string[] schemaNames)
         {
-            path = basePath;
+            topicRelativePath = topicPath;
             appName = btsAppName;
+            schemas = schemaNames;
             tokenId = CleanAndPrep(btsAppName + ".Schemas");
-            TokenFile.GetTokenFile().AddTopicToken(tokenId,id);
-            TimerStart();
+            TokenFile.GetTokenFile().AddTopicToken(tokenId,id);            
             topics = new List<SchemaTopic>();
-            schsWorker = new BackgroundWorker();
-            schsWorker.DoWork += schWorker_DoWork;
-            schsWorker.RunWorkerCompleted += schWorker_RunWorkerCompleted;
-            schsWorker.RunWorkerAsync();
         }
 
-        public void Dispose()
+        void SaveTopic()
         {
-            foreach (SchemaTopic topic in topics)
-            {
-                topic.Dispose();
-            }
-            schsWorker.Dispose();
-            
-        }
-
-        void schWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            foreach (SchemaTopic topic in topics)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
-            }
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        void schWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
             try
             {
-                List<XElement> elems = new List<XElement>();
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+                var elems = new List<XElement>();
+
                 root = CreateDeveloperOrientationElement();
-                XElement intro = new XElement(xmlns + "introduction",new XElement(xmlns + "para", new XText("This section outlines the XML schemas contained in the BizTalk application.")));
-                foreach (Schema schema in bce.Applications[appName].Schemas)
+                var intro = new XElement(xmlns + "introduction",new XElement(xmlns + "para", new XText("This section outlines the XML schemas contained in the BizTalk application.")));
+                foreach (var name in schemas)
                 {
-                    elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Schemas." + schema.FullName)))));
-                    topics.Add(new SchemaTopic(appName,path,schema.FullName));
+                    elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Schemas." + name)))));
+                    topics.Add(new SchemaTopic(appName,topicRelativePath, name));
                 }
                 
-                XElement inThis = new XElement(xmlns + "inThisSection", new XText("This application contains the following schemas:"));
+                var inThis = new XElement(xmlns + "inThisSection", new XText("This application contains the following schemas:"));
                 
                 inThis.Add(elems.ToArray());
                 root.Add(intro, inThis);
-                PrintLine("schemas topic: {0}",root.ToString(SaveOptions.None));
                 if (doc.Root != null) doc.Root.Add(root);
             }
             catch(Exception ex)
             {
                 HandleException("SchemasTopic.DoWork",ex);
             }
-            finally
-            {
-                bce.Dispose();
-            }
         }
 
         public XElement GetContentLayout()
         {
-            List<XElement> t = new List<XElement>();
-            foreach (SchemaTopic topic in topics)
+            var t = new List<XElement>();
+            foreach (var topic in topics)
             {
                 t.Add(topic.GetContentLayout());
             }
 
-            XElement xe = new XElement("Topic",
+            var xe = new XElement("Topic",
                                 new XAttribute("id", id),
                                 new XAttribute("visible", "true"),
                                 new XAttribute("title", "Schemas"));
@@ -102,17 +69,16 @@ namespace EndpointSystems.BizTalk.Documentation
             return xe;
         }
 
-        public new void Save()
+        public override void Save()
         {
-            base.Save();
-            foreach (SchemaTopic topic in topics)
+            TimerStart();
+            SaveTopic();
+            foreach (var topic in topics)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
                 topic.Save();
             }
+            base.Save();
+            TimerStop();
         }
     }
 }

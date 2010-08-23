@@ -1,10 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Xml.Linq;
 using EndpointSystems.OrchestrationLibrary;
-using Microsoft.BizTalk.ExplorerOM;
 using Microsoft.BizTalk.RuleEngineExtensions;
 using Microsoft.RuleEngine;
 using DictionaryEntry=System.Collections.DictionaryEntry;
@@ -13,59 +11,44 @@ using Policy=Microsoft.BizTalk.ExplorerOM.Policy;
 namespace EndpointSystems.BizTalk.Documentation
 {
     /// <summary>
-    /// Generates documentation for the BRE ruleset associated with the specified BizTalk application.
+    /// Generates documentation for the BRE rule set associated with the specified BizTalk application.
     /// </summary>
     /// <remarks>
     ///  Token ID is appName + ".Policies." + ruleName
     /// </remarks>
-    public class BusinessRuleTopic: TopicFile, IDisposable
+    class BusinessRuleTopic: TopicFile
     {
-        private readonly BackgroundWorker brWorker;
         private readonly string ruleName;
         private XElement root;
         private readonly string rulesDb;
-        public BusinessRuleTopic(string btsAppName, string basePath, string btsRuleName, string btsRulesDb)
+
+        public BusinessRuleTopic(string btsAppName, string basePath, string btsRuleName)
         {
             appName = btsAppName;
-            path = basePath;
+            topicRelativePath = basePath;
             tokenId = CleanAndPrep(appName + ".Policies." + btsRuleName);
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
-            TimerStart();
             ruleName = btsRuleName;
-            rulesDb = btsRulesDb;
-            brWorker = new BackgroundWorker();
-            brWorker.DoWork += brWorker_DoWork;
-            brWorker.RunWorkerCompleted += brWorker_RunWorkerCompleted;
-            brWorker.RunWorkerAsync();
+            rulesDb = ProjectConfiguration.RulesDatabase;
         }
 
-        void brWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
 
-        void brWorker_DoWork(object sender, DoWorkEventArgs e)
+        void SaveTopic()
         {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
-            bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+            //var bce = CatalogExplorerFactory.CatalogExplorer();
+            //bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
             try
             {
                 root = CreateDeveloperConceptualElement();
-                SqlRuleStore srs = new SqlRuleStore(bce.ConnectionString.Replace("BizTalkMgmtDb", rulesDb));
+                var srs = new SqlRuleStore(CatalogExplorerFactory.CatalogExplorer().ConnectionString.Replace("BizTalkMgmtDb", rulesDb));
                 XElement intro;
                 //find our policy in the crowd
                 Policy p = null;
-                foreach(Policy policy in  bce.Applications[appName].Policies)
+                foreach (Policy policy in CatalogExplorerFactory.CatalogExplorer().Applications[appName].Policies)
                 {
-                    if (policy.Name.Equals(ruleName))
-                    {
-                        p = policy;
-                        break;
-                    }
+                    if (!policy.Name.Equals(ruleName)) continue;
+                    p = policy;
+                    break;
                 }
                 if (p == null)
                 {
@@ -76,12 +59,12 @@ namespace EndpointSystems.BizTalk.Documentation
                     return;
                 }
 
-                RuleSet rs = srs.GetRuleSet(new RuleSetInfo(p.Name, p.MajorRevision, p.MinorRevision));
+                var rs = srs.GetRuleSet(new RuleSetInfo(p.Name, p.MajorRevision, p.MinorRevision));
 
                 root = CreateDeveloperXmlReference();
-                intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText(string.Format("This section outlines the properties for the {0} ruleset.",p.Name))));
+                intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText(string.Format("This section outlines the properties for the {0} rule set.",p.Name))));
                 
-                XElement exeConfInfo = new XElement(xmlns + "section",
+                var exeConfInfo = new XElement(xmlns + "section",
                     new XElement(xmlns + "title", new XText("Execution Configuration Properties")),
                     new XElement(xmlns + "content",
                         new XElement(xmlns + "table",
@@ -112,17 +95,17 @@ namespace EndpointSystems.BizTalk.Documentation
                                     new XElement(xmlns + "entry", new XText(null == rs.ExecutionConfiguration.Translator ? "N/A" : rs.ExecutionConfiguration.Translator.AssemblyName ?? "N/A")))
                         )));                
 
-                List<XElement> rulesList = new List<XElement>();
+                var rulesList = new List<XElement>();
                 IEnumerator iter = rs.Rules.GetEnumerator();
 
                 while (iter.MoveNext())
                 {
-                    DictionaryEntry de = (DictionaryEntry)iter.Current;
-                    Rule r = de.Value as Rule;
+                    var de = (DictionaryEntry)iter.Current;
+                    var r = de.Value as Rule;
                     if (null == r) continue;
-                    RuleSetInfo rsi = new RuleSetInfo(p.Name, p.MajorRevision, p.MinorRevision);
-                    RuleDisplayStringExtractor rdse = new RuleDisplayStringExtractor(srs, rsi);
-                    XElement s = new XElement(xmlns + "section",
+                    var rsi = new RuleSetInfo(p.Name, p.MajorRevision, p.MinorRevision);
+                    var rdse = new RuleDisplayStringExtractor(srs, rsi);
+                    var s = new XElement(xmlns + "section",
                         new XElement(xmlns + "title", new XText(string.Format("Rule: {0}",r.Name))),
                         new XElement(xmlns + "content",
                             new XElement(xmlns + "para",new XElement(xmlns + "legacyBold", new XText("Rule display:"))),
@@ -151,10 +134,10 @@ namespace EndpointSystems.BizTalk.Documentation
                 }
                 
                 //parent section
-                XElement section = new XElement(xmlns + "section", 
-                    new XElement(xmlns + "title", new XText("Business Ruleset Properties")),
+                var section = new XElement(xmlns + "section", 
+                    new XElement(xmlns + "title", new XText("Business RuleSet Properties")),
                         new XElement(xmlns + "content", 
-                            new XElement(xmlns + "para", new XText(rs.CurrentVersion.Description ?? "The current version of this ruleset has no comments associated with it.")),
+                            new XElement(xmlns + "para", new XText(rs.CurrentVersion.Description ?? "The current version of this rule set has no comments associated with it.")),
                             new XElement(xmlns + "table",
                             new XElement(xmlns + "tableHeader", 
                                 new XElement(xmlns + "row",
@@ -179,20 +162,19 @@ namespace EndpointSystems.BizTalk.Documentation
             {                    
                 HandleException("BusinessRuleTopic.DoWork",ex);
             }
-            finally
-            {
-                bce.Dispose();
-            }
         }
 
         public XElement GetContentLayout()
         {
-            return GetContentLayout(ruleName);
+            return NewTopicEntry(ruleName);
         }
 
-        public void Dispose()
+        public override void Save()
         {
-            brWorker.Dispose();
+            TimerStart();
+            SaveTopic();
+            base.Save();
+            TimerStop();
         }
     }
 }

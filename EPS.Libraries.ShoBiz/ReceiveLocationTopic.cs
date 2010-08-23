@@ -1,62 +1,36 @@
 using System;
-using System.ComponentModel;
 using System.Xml.Linq;
 using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
-    public class ReceiveLocationTopic: TopicFile, IDisposable
+    class ReceiveLocationTopic: TopicFile
     {
-        private readonly BackgroundWorker rlWorker;
         private readonly string recLocName;
         private XElement root;
-        public ReceiveLocationTopic(string btsAppName, string basePath, string btsRelName)
+        public ReceiveLocationTopic(string btsAppName, string topicPath, string btsRelName)
         {
-            ///HACK: assign 'temporary' token id for timer
-            tokenId = CleanAndPrep(appName + ".ReceiveLocations." + btsRelName);
-            TimerStart();
             appName = btsAppName;
-            rlWorker = new BackgroundWorker();
-            path = basePath;
+            topicRelativePath = topicPath;
             recLocName = btsRelName;
-            rlWorker.DoWork += rlWorker_DoWork;
-            rlWorker.RunWorkerCompleted += rlWorker_RunWorkerCompleted;
-            rlWorker.RunWorkerAsync();
         }
 
-        public void Dispose()
+        void SaveTopic()
         {
-            rlWorker.Dispose();
-        }
-        void rlWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            ///HACK: set token back for timer consistency
-            tokenId = CleanAndPrep(appName + ".ReceiveLocations." + recLocName);
-            TimerStop();
-        }
-
-        void rlWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
+            //var bce = CatalogExplorerFactory.CatalogExplorer();
 
             try
             {
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+                //bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
                 ReceiveLocation rl = null;
-                foreach (ReceivePort port in bce.Applications[appName].ReceivePorts)
+                foreach (ReceivePort port in CatalogExplorerFactory.CatalogExplorer().Applications[appName].ReceivePorts)
                 {
                     foreach (ReceiveLocation rloc in port.ReceiveLocations)
                     {
-                        if (rloc.Name.Equals(recLocName))
-                        {
-                            rl = rloc;
-                            break;
-                        }                            
+                        if (!rloc.Name.Equals(recLocName)) continue;
+                        rl = rloc;
+                        break;
                     }
                 }
 
@@ -66,10 +40,10 @@ namespace EndpointSystems.BizTalk.Documentation
                 tokenId = CleanAndPrep(appName + ".ReceiveLocations." + rl.ReceivePort.Name + rl.Name);
                 TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
 
-                XElement intro = new XElement(xmlns + "introduction", 
+                var intro = new XElement(xmlns + "introduction", 
                     new XElement(xmlns + "para", new XText(string.IsNullOrEmpty(rl.Description) ? "No description was available for this receive location." : rl.Description)));
 
-                XElement section = new XElement(xmlns + "section",
+                var section = new XElement(xmlns + "section",
                     new XElement(xmlns + "title", new XText("Receive Location Properties")),
                     new XElement(xmlns + "content", 
                         new XElement(xmlns + "table",
@@ -146,15 +120,18 @@ namespace EndpointSystems.BizTalk.Documentation
         {
             HandleException("ReceiveLocationTopic.DoWork", ex);
         }
-        finally
-        {
-            bce.Dispose();
-        }
     }
+        public override void Save()
+        {
+            TimerStart();
+            SaveTopic();
+            base.Save();
+            TimerStop();
+        }
 
         public XElement GetContentLayout()
         {
-            return GetContentLayout(recLocName);
+            return NewTopicEntry(recLocName);
         }
     }
 }

@@ -3,20 +3,25 @@ using System.Xml.Linq;
 namespace EndpointSystems.BizTalk.Documentation
 {
     /// <summary>
-    /// This class takes the topic hierarchy from the objects and saves it to a 
+    /// This class takes the topic hierarchy from the objects and saves it to a content file.
     /// </summary>
     public class ContentFile
     {
         private static ContentFile contentFile;
         private static XDocument doc;
+
+        private ContentFile(){}
+
+        /// <summary>
+        /// Returns the singleton <see cref="ContentFile"/> instance.
+        /// </summary>
+        /// <returns></returns>
         public static ContentFile GetContentFile()
         {
             if (contentFile == null)
             {
                 contentFile = new ContentFile();
-                doc = new XDocument(
-                    new XElement("Topics")
-                    );
+                doc = new XDocument(new XElement("Topics"));
             }
             return contentFile;
         }
@@ -29,6 +34,10 @@ namespace EndpointSystems.BizTalk.Documentation
             if (doc.Root != null) doc.Root.Add(appTopic);
         }
 
+        /// <summary>
+        /// Save the content file.
+        /// </summary>
+        /// <param name="fullPath"></param>
         public void Save(string fullPath)
         {
             doc.Save(fullPath);

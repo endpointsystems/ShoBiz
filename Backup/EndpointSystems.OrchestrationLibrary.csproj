@@ -1,0 +1,99 @@
+﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{0D3731A9-02C6-447F-A260-4AEEC4B64F8C}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>EndpointSystems.OrchestrationLibrary</RootNamespace>
+    <AssemblyName>EndpointSystems.OrchestrationLibrary</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.BizTalk.ExplorerOM, Version=3.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\ReferenceBin\Microsoft.BizTalk.ExplorerOM.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BtsBaseComponent.cs" />
+    <Compile Include="BtsCallShape.cs" />
+    <Compile Include="BtsCatchShape.cs" />
+    <Compile Include="BtsCompensation.cs" />
+    <Compile Include="BtsConstructShape.cs" />
+    <Compile Include="BtsMethodMessageType.cs" />
+    <Compile Include="BtsRules.cs" />
+    <Compile Include="BtsServiceLinkType.cs" />
+    <Compile Include="BtsSuspendShape.cs" />
+    <Compile Include="TreeBranch.cs" />
+    <Compile Include="BtsDelayShape.cs" />
+    <Compile Include="Tree.cs" />
+    <Compile Include="BtsFilter.cs" />
+    <Compile Include="BtsMessageDeclaration.cs" />
+    <Compile Include="BtsMsgAssignmentShape.cs" />
+    <Compile Include="BtsMultiPartMessageType.cs" />
+    <Compile Include="BtsOrch.cs" />
+    <Compile Include="BtsOrchMsg.cs" />
+    <Compile Include="BtsOrchVariable.cs" />
+    <Compile Include="BtsPortDeclaration.cs" />
+    <Compile Include="BtsPortType.cs" />
+    <Compile Include="BtsReciveShape.cs" />
+    <Compile Include="BtsContainer.cs" />
+    <Compile Include="BtsSendShape.cs" />
+    <Compile Include="BtsServiceBody.cs" />
+    <Compile Include="BtsServiceDeclaration.cs" />
+    <Compile Include="BtsStatementRefShape.cs" />
+    <Compile Include="BtsTaskShape.cs" />
+    <Compile Include="BtsTerminateShape.cs" />
+    <Compile Include="BtsThrowShape.cs" />
+    <Compile Include="BtsTransactionAttribute.cs" />
+    <Compile Include="BtsTransform.cs" />
+    <Compile Include="BtsTx.cs" />
+    <Compile Include="BtsVariableAssignmentShape.cs" />
+    <Compile Include="BtsVariableDeclaration.cs" />
+    <Compile Include="BtsWhileShape.cs" />
+    <Compile Include="Correlation.cs" />
+    <Compile Include="Enums.cs" />
+    <Compile Include="Exceptions.cs" />
+    <Compile Include="Factories.cs" />
+    <Compile Include="Generics.cs" />
+    <Compile Include="Interfaces.cs" />
+    <Compile Include="OrchestrationReport.cs" />
+    <Compile Include="BtsServiceLinkDeclaration.cs" />
+    <Compile Include="Singletons.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="XmlReaderCtorSnippet.snippet">
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

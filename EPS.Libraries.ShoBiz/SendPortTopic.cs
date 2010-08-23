@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Xml.Linq;
 using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
@@ -7,49 +6,31 @@ using Microsoft.BizTalk.ExplorerOM;
 namespace EndpointSystems.BizTalk.Documentation
 {
 
-    public class SendPortTopic: TopicFile, IDisposable
+    class SendPortTopic: TopicFile
     {
-        private readonly BackgroundWorker spWorker;
         private XElement root;
         private readonly string sendPortName;
+
         public SendPortTopic(string btsAppName, string btsBaseDir, string btsSendPortName)
         {
             tokenId = CleanAndPrep(btsAppName + ".SendPorts." + btsSendPortName);
-            TimerStart();
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
             appName = btsAppName;
-            path = btsBaseDir;
-            spWorker = new BackgroundWorker();
-            spWorker.DoWork += spWorker_DoWork;
+            topicRelativePath = btsBaseDir;
             sendPortName = btsSendPortName;
-            spWorker.RunWorkerCompleted += spWorker_RunWorkerCompleted;
-            spWorker.RunWorkerAsync();
         }
 
-        public void Dispose()
-        {
-            if (spWorker != null) spWorker.Dispose();
-        }
 
-        void spWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        void SaveTopic()
         {
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        void spWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
-            bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
-            SendPort sp = bce.Applications[appName].SendPorts[sendPortName];
+            //var bce = CatalogExplorerFactory.CatalogExplorer();
+            //bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+            var sp = CatalogExplorerFactory.CatalogExplorer().Applications[appName].SendPorts[sendPortName];
             root = CreateDeveloperConceptualElement();
 
-            XElement intro = new XElement(xmlns + "introduction",
+            var intro = new XElement(xmlns + "introduction",
                     new XElement(xmlns + "para", new XText(string.IsNullOrEmpty(sp.Description)? "No description was available for this send port." : sp.Description )));
-            XElement section = new XElement(xmlns + "sections", new XElement("section", new XElement(xmlns + "title",new XText("Send Port Properties")),
+            var section = new XElement(xmlns + "sections", new XElement("section", new XElement(xmlns + "title",new XText("Send Port Properties")),
                     new XElement(xmlns + "content",
                         new XElement(xmlns + "table",
                             new XElement(xmlns + "tableHeader", 
@@ -118,8 +99,8 @@ namespace EndpointSystems.BizTalk.Documentation
                                                                              new XText(
                                                                                  "Transport information unavailable for this artifact."))));                 
              }
-             bool nullTrans = null == ti.TransportType;             
-             XElement transport = new XElement(xmlns + "section",
+             var nullTrans = null == ti.TransportType;             
+             var transport = new XElement(xmlns + "section",
                      new XElement(xmlns + "title", new XText(title)),
                      new XElement(xmlns + "content",
                          new XElement(xmlns + "table",
@@ -168,10 +149,17 @@ namespace EndpointSystems.BizTalk.Documentation
          }
          return null;
      }
+        public override void Save()
+        {
+            TimerStart();
+            SaveTopic();
+            base.Save();
+            TimerStop();
+        }
 
         public XElement GetContentLayout()
         {
-            return GetContentLayout(sendPortName);
+            return NewTopicEntry(sendPortName);
         }
 
     }

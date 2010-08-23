@@ -1,8 +1,6 @@
 using System;
-using System.ComponentModel;
-using System.IO;
+using System.Diagnostics;
 using System.Text;
-using System.Threading;
 using System.Xml.Linq;
 using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
@@ -15,55 +13,52 @@ namespace EndpointSystems.BizTalk.Documentation
     /// <remarks>
     ///     Token ID: appName + ".Schemas." + schema.FullName
     /// </remarks>
-    public class SchemaTopic: TopicFile, IDisposable
+    public class SchemaTopic: TopicFile
     {
         private readonly string schemaName;
-        private readonly BackgroundWorker schWorker;
         private XElement root;
-        private StringBuilder sb;
+        private readonly StringBuilder sb;
         private string schemaTitle;
-        public SchemaTopic(string btsAppName, string baseDir, string btsSchemaName)
+
+        /// <summary>
+        /// Creates a new Sandcastle schema documentation topic.
+        /// </summary>
+        /// <param name="btsAppName">The BizTalk application name.</param>
+        /// <param name="topicPath">The path to where the topic should be saved.</param>
+        /// <param name="btsSchemaName">The name of the schema to document.</param>
+        public SchemaTopic(string btsAppName, string topicPath, string btsSchemaName)
         {
             appName = btsAppName;
             schemaName = btsSchemaName;
-            path = baseDir;
+            topicRelativePath = topicPath;
             tokenId = CleanAndPrep(appName + ".Schemas." + btsSchemaName);
-            TimerStart();
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
             sb = new StringBuilder();
-            schWorker = new BackgroundWorker();
-            schWorker.DoWork += schWorker_DoWork;
-            schWorker.RunWorkerCompleted += schWorker_RunWorkerCompleted;
-            schWorker.RunWorkerAsync();
         }
 
-        public void Dispose()
+        void SaveTopic()
         {
-            schWorker.Dispose();
-        }
-        void schWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        void schWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
+            //var bce = CatalogExplorerFactory.CatalogExplorer();
             try
             {
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
-                Schema s = bce.Applications[appName].Schemas[schemaName];
-                schemaTitle = s.RootName == null ? schemaName : schemaName + "#" + s.RootName;
+                //bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+                Schema s = null;
+                var split = schemaName.Split(new[]{"___"},StringSplitOptions.None);
+                foreach (Schema schema in CatalogExplorerFactory.CatalogExplorer().Applications[appName].Schemas)
+                {                    
+                    if (!schema.FullName.Equals(split[0]) && !schema.RootName.Equals(split[1])) continue;
+                    s = schema;
+                }
+
+                if (s == null) throw new NullReferenceException("Schema " + schemaName + " was not found in the BizTalk ExplorerOM.");
+
+                schemaTitle = s.RootName == null ? schemaName : split[0] + "#" + split[1];
                 sb.Append(
                     "<?xml version=\"1.0\" encoding=\"utf-8\"?><topic id=\"" + id + "\" revisionNumber=\"1\">");
                 root = CreateDeveloperXmlReference();
                 
-                XElement intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText(string.IsNullOrEmpty(s.Description)? "No description was found for the schema." : s.Description)));
-                XElement section = new XElement(xmlns + "section", new XElement(xmlns + "title", new XText("Schema Properties")),
+                var intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText(string.IsNullOrEmpty(s.Description)? "No description was found for the schema." : s.Description)));
+                var section = new XElement(xmlns + "section", new XElement(xmlns + "title", new XText("Schema Properties")),
                                                                     new XElement(xmlns + "content",
                                                                         new XElement(xmlns + "table",
                                                                             new XElement(xmlns + "tableHeader",
@@ -95,48 +90,37 @@ namespace EndpointSystems.BizTalk.Documentation
                                                                                 new XElement(xmlns + "entry", new XText("Type")),
                                                                                 new XElement(xmlns + "entry", new XText(s.Type.ToString()))))));
 
-                XElement content = new XElement(xmlns + "codeExample", new XElement(xmlns + "code",new XAttribute("language","xml"), new XText(s.XmlContent)));
+                var content = new XElement(xmlns + "codeExample", 
+                    new XElement(xmlns + "code",new XAttribute("language","xml"), new XText(s.XmlContent)));
                 
                 root.Add(intro,section,content);
-                sb.Append(root.ToString(SaveOptions.None));
+                sb.Append(root.ToString());
                 sb.Append("</topic>");
             }
                 catch(Exception ex)
                 {
                     HandleException("SchemaTopic.DoWork", ex);
                 }
-            finally
-            {
-                bce.Dispose();
-            }
         }
 
-        public new void Save()
+        /// <summary>
+        /// Save the topic.
+        /// </summary>
+        public override void Save()
         {
-            try
-            {
-                string savePath = path + id + ".aml";
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!ReadyToSave);
-                using (StreamWriter sw = new StreamWriter(savePath))
-                {
-                    sw.Write(sb.ToString());
-                    sw.Flush();
-                    sw.Close();
-                    ProjectFile.GetProjectFile().AddTopicItem(savePath);
-                }
-            }
-            catch(Exception ex)
-            {
-                HandleException("SchemaTopic.Save", ex);
-            }
+            TimerStart();
+            SaveTopic();
+            Save(sb.ToString());
+            TimerStop();
         }
 
+        /// <summary>
+        /// Get the Sandcastle content layout for the topic.
+        /// </summary>
+        /// <returns>An <see cref="XElement"/> containing the content layout information.</returns>
         public XElement GetContentLayout()
         {
-            return GetContentLayout(schemaTitle);
+            return NewTopicEntry(schemaTitle);
         }
 
     }

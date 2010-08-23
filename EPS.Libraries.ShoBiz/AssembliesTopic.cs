@@ -1,103 +1,87 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using EndpointSystems.OrchestrationLibrary;
-using Microsoft.BizTalk.ExplorerOM;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
     /// <summary>
     /// A orientation document outlining the assemblies used in the app.
     /// </summary>
-    public class AssembliesTopic : TopicFile, IDisposable
+    class AssembliesTopic : TopicFile
     {
         //private BackgroundWorker assemblyWorker;
         private readonly List<AssemblyTopic> assemblyTopics;
+        private readonly string[] resources;
 
-        public AssembliesTopic(string basePath, string btsAppName)
+        /// <summary>
+        /// Creates a new Sandcastle orientation topic for BizTalk assemblies.
+        /// </summary>
+        /// <param name="basePath">The path to save the topic files.</param>
+        /// <param name="btsAppName">The BizTalk application name.</param>
+        /// <param name="assemblies">The BizTalk assemblies to document.</param>
+        public AssembliesTopic(string basePath, string btsAppName, string[] assemblies)
         {
+            resources = assemblies;
             tokenId = CleanAndPrep(appName + ".Resources");
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
-            TimerStart();
             assemblyTopics = new List<AssemblyTopic>();
             appName = btsAppName;
-            path = basePath;
-            DoWork();
-            Run();
-            TimerStop();
+            topicRelativePath = basePath;
         }
 
-        public void Dispose()
-        {
-            foreach (AssemblyTopic topic in assemblyTopics)
-            {                
-                topic.Dispose();
-            }
-        }
-
-        private void Run()
-        {
-            foreach (AssemblyTopic topic in assemblyTopics)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
-            }
-            lock (this)
-            {
-                ReadyToSave = true;
-            }
-        }
-
-        private void DoWork()
+        private void SaveTopic()
         {
             //build topic
-            XElement root = CreateDeveloperOrientationElement();
+            var root = CreateDeveloperOrientationElement();
             root.Add(new XElement(xmlns + "introduction",
                                   new XElement(xmlns + "para",
                                                new XText(
                                                    string.Format(
                                                        "This section contains information about the assemblies used in the {0} application.",
                                                        appName)))));
-            List<XElement> elems =
+            var elems =
                 new List<XElement>(CatalogExplorerFactory.CatalogExplorer().Applications[appName].Assemblies.Count);
 
-            foreach (BtsAssembly assy in CatalogExplorerFactory.CatalogExplorer().Applications[appName].Assemblies)
+            foreach (var assy in resources)
             {
-                assemblyTopics.Add(new AssemblyTopic(appName, assy.Name, path));
-                elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "topic", new XText(CleanAndPrep(appName + ".Assemblies." + assy.Name)))));
+                assemblyTopics.Add(new AssemblyTopic(appName, assy, topicRelativePath));
+                elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "topic", new XText(CleanAndPrep(appName + ".Assemblies." + assy)))));
             }
 
-            XElement thisSection = new XElement(xmlns + "inThisSection", new XText("This application contains the following assemblies:"),elems.ToArray());
+            var thisSection = new XElement(xmlns + "inThisSection", new XText("This application contains the following assemblies:"),elems.ToArray());
             root.Add(thisSection);
             if (doc.Root != null) doc.Root.Add(root);
         }
 
-        public new void Save()
+        /// <summary>
+        /// Save the BizTalk Assemblies and all child Assembly topic files.
+        /// </summary>
+        public override void Save()
         {
-            base.Save();
-            foreach (AssemblyTopic topic in assemblyTopics)
+            TimerStart();
+            SaveTopic();
+            foreach (var topic in assemblyTopics)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
                 topic.Save();
             }
-            doc.Save(path + id + ".aml");
+            base.Save();
+            TimerStop();
         }
 
+        /// <summary>
+        /// Get the Sandcastle content layout for the topic.
+        /// </summary>
+        /// <returns>An <see cref="XElement"/> containing the content layout information.</returns>
         public XElement GetContentLayout()
         {
-            XElement ret = new XElement("Topic",
+            var ret = new XElement("Topic",
                                         new XAttribute("id", id),
                                         new XAttribute("visible", "true"),
                                         new XAttribute("title", "Resources"));
-            foreach (AssemblyTopic topic in assemblyTopics)
+            foreach (var topic in assemblyTopics)
             {
-                ret.Add(topic.GetContentLayout());
+                if (topic != null) ret.Add(topic.GetContentLayout());
             }
             return ret;
         }

@@ -1,56 +1,37 @@
 using System;
 using System.Collections.Generic;
 using System.Xml.Linq;
-using System.ComponentModel;
 using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
-    public class ReceivePortTopic: TopicFile, IDisposable
+    class ReceivePortTopic: TopicFile
     {
         private readonly string rpName;
-        private readonly BackgroundWorker rpWorker;
         public ReceivePortTopic(string btsAppName, string btsBaseDir, string btsReceivePortName)
         {
             rpName = btsReceivePortName;
             appName = btsAppName;
             tokenId = btsAppName + ".ReceivePorts." + btsReceivePortName;
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
-            TimerStart();
-            path = btsBaseDir;
-            rpWorker = new BackgroundWorker();
-            rpWorker.DoWork += rpWorker_DoWork;
-            rpWorker.RunWorkerCompleted += rpWorker_RunWorkerCompleted;
-            rpWorker.RunWorkerAsync();
+            topicRelativePath = btsBaseDir;
         }
 
-        public void Dispose()
-        {
-            rpWorker.Dispose();
-        }
 
-        void rpWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
 
-        void rpWorker_DoWork(object sender, DoWorkEventArgs e)
+        void SaveTopic()
         {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
+            //var bce = CatalogExplorerFactory.CatalogExplorer();
             try
             {
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
-                XElement root = CreateDeveloperConceptualElement();
-                ReceivePort rp = bce.Applications[appName].ReceivePorts[rpName];
+                //bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+                var root = CreateDeveloperConceptualElement();
+                var rp = CatalogExplorerFactory.CatalogExplorer().Applications[appName].ReceivePorts[rpName];
 
-                XElement intro = new XElement(xmlns + "introduction",new XElement(xmlns + "para", string.IsNullOrEmpty(rp.Description) ? new XText("No description was available for this receive location.") : new XText(rp.Description)));
+                var intro = new XElement(xmlns + "introduction",new XElement(xmlns + "para", string.IsNullOrEmpty(rp.Description) ? new XText("No description was available for this receive location.") : new XText(rp.Description)));
                 
-                XElement section = new XElement(xmlns + "section",  new XElement(xmlns + "title",new XText(rp.Name + " Properties")),
+                var section = new XElement(xmlns + "section",  new XElement(xmlns + "title",new XText(rp.Name + " Properties")),
                                                                     new XElement(xmlns + "content",
                                                                         new XElement(xmlns + "table", 
                                                                             new XElement(xmlns + "tableHeader", 
@@ -82,8 +63,8 @@ namespace EndpointSystems.BizTalk.Documentation
                                                                                 new XElement(xmlns + "entry", new XText("Tracking")),
                                                                                 new XElement(xmlns + "entry", new XText(rp.Tracking.ToString()))))));
                 root.Add(intro, section);
-                List<XElement> inTrans = new List<XElement>();
-                List<XElement> outTrans = new List<XElement>();
+                var inTrans = new List<XElement>();
+                var outTrans = new List<XElement>();
 
                 if (null != rp.InboundTransforms)
                 {
@@ -103,7 +84,7 @@ namespace EndpointSystems.BizTalk.Documentation
 
                 if (inTrans.Count > 0)
                 {
-                    XElement mapsIn = new XElement(xmlns + "section",
+                    var mapsIn = new XElement(xmlns + "section",
                                                    new XElement(xmlns + "title", new XText("Inbound Transforms")),
                                                    new XElement(xmlns + "content",
                                                                 new XElement(xmlns + "para",
@@ -114,7 +95,7 @@ namespace EndpointSystems.BizTalk.Documentation
                 }
                 if (outTrans.Count > 0)
                 {
-                    XElement mapsOut = new XElement(xmlns + "section",
+                    var mapsOut = new XElement(xmlns + "section",
                                                     new XElement(xmlns + "title", new XText("Outbound Transforms")),
                                                     new XElement(xmlns + "content",
                                                                  new XElement(xmlns + "para",
@@ -130,15 +111,19 @@ namespace EndpointSystems.BizTalk.Documentation
             {
                 HandleException("ReceivePortTopic.DoWork",ex);
             }
-            finally
-            {
-                bce.Dispose();                
-            }
+        }
+
+        public override void Save()
+        {
+            TimerStart();
+            SaveTopic();
+            base.Save();
+            TimerStop();            
         }
 
         public XElement GetContentLayout()
         {
-            return GetContentLayout(rpName);
+            return NewTopicEntry(rpName);
         }
     }
 }

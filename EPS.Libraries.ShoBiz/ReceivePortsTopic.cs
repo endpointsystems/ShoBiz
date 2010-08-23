@@ -1,78 +1,38 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Xml.Linq;
-using System.Diagnostics;
-using System.Threading;
-using EndpointSystems.OrchestrationLibrary;
-using Microsoft.BizTalk.ExplorerOM;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
-    class ReceivePortsTopic: TopicFile, IDisposable
+    class ReceivePortsTopic: TopicFile
     {
         private readonly List<ReceivePortTopic> topics;
-        private readonly BackgroundWorker rpWorker;
         private XElement root;
-        public ReceivePortsTopic(string btsAppName, string btsBaseDir)
+        private readonly string[] ports;
+
+        public ReceivePortsTopic(string btsAppName, string topicPath, string[] receivePorts)
         {
+            ports = receivePorts;
             tokenId = CleanAndPrep(btsAppName + ".ReceivePorts");
-            TimerStart();
-            path = btsBaseDir;
+            topicRelativePath = topicPath;
             appName = btsAppName;
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
-            rpWorker = new BackgroundWorker();
-            rpWorker.DoWork += rpWorker_DoWork;
-            rpWorker.RunWorkerCompleted += rpWorker_RunWorkerCompleted;
             topics = new List<ReceivePortTopic>();
-            rpWorker.RunWorkerAsync();
-
         }
 
-        public void Dispose()
+        void SaveTopic()
         {
-            if (null != topics)
-            {
-                foreach (ReceivePortTopic topic in topics)
-                {
-                    topic.Dispose();
-                }
-            }
-            rpWorker.Dispose();
-        }
-
-        void rpWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            foreach (ReceivePortTopic topic in topics)
-            {
-                do
-                {
-                    Trace.WriteLine("[ReceivePortsTopic] Waiting for a receive port topic..");
-                    Thread.Sleep(100);                    
-                } while (!topic.ReadyToSave);
-            }
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        void rpWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
             root = CreateDeveloperOrientationElement();
-            XElement intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para","The following receive ports are associated with this BizTalk application."));
-            XElement section = new XElement(xmlns + "inThisSection");
-            List<XElement> paras = new List<XElement>();
+            var intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para","The following receive ports are associated with this BizTalk application."));
+            var section = new XElement(xmlns + "inThisSection");
+            var paras = new List<XElement>();
             try
             {
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
-
-                foreach (ReceivePort port in bce.Applications[appName].ReceivePorts)
+                foreach (var name in ports)
                 {
-                    paras.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".ReceivePorts." + port.Name)))));
-                    topics.Add(new ReceivePortTopic(appName,path,port.Name));
+                    paras.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".ReceivePorts." + name)))));
+                    topics.Add(new ReceivePortTopic(appName,topicRelativePath,name));
                 }
 
                 section.Add(new XText("This application contains the following receive ports:"),paras.ToArray());
@@ -87,13 +47,13 @@ namespace EndpointSystems.BizTalk.Documentation
 
         public XElement GetContentLayout()
         {
-            List<XElement> t = new List<XElement>();
-            foreach (ReceivePortTopic topic in topics)
+            var t = new List<XElement>();
+            foreach (var topic in topics)
             {
                 t.Add(topic.GetContentLayout());
             }
 
-            XElement xe = new XElement("Topic",
+            var xe = new XElement("Topic",
                                 new XAttribute("id", id),
                                 new XAttribute("visible", "true"),
                                 new XAttribute("title", "Receive Ports"));
@@ -102,14 +62,18 @@ namespace EndpointSystems.BizTalk.Documentation
             return xe;
         }
 
-        public new void Save()
-        {
-            base.Save();
 
-            foreach (ReceivePortTopic topic in topics)
+        public override void Save()
+        {
+            TimerStart();
+            SaveTopic();
+            foreach (var topic in topics)
             {
                 topic.Save();
             }
+//            loopResult = Parallel.ForEach(topics, SaveAllTopics);
+            base.Save();
+            TimerStop();            
         }
     }
 }

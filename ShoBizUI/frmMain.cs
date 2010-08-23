@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
-using System.Threading;
 using System.Windows.Forms;
 using EndpointSystems.BizTalk.Documentation;
 using EndpointSystems.OrchestrationLibrary;
@@ -16,9 +15,9 @@ namespace ShoBizUI
     public partial class frmMain : Form
     {
         private const string MULTI = ";MultipleActiveResultSets=True";
-        delegate void BuildDelegate();
 
         private readonly BtsCatalogExplorer bce;
+
         public frmMain()
         {
             bce = new BtsCatalogExplorer();
@@ -37,12 +36,13 @@ namespace ShoBizUI
         private void btnConnect_Click(object sender, EventArgs e)
         {
             Cursor = Cursors.WaitCursor;
+            
+            if (lbApps.Items.Count > 0) lbApps.Items.Clear();
+            
             try
             {
                 lblStatus.Text = "Connecting...";
-                bce.ConnectionString = tbConnectionString.Text;
-                lblStatus.Text = "Connected.";
-                foreach (Application app in bce.Applications)
+                foreach (Application app in CatalogExplorerFactory.CatalogExplorer().Applications)
                 {
                     lbApps.Items.Add(app.Name);
                 }
@@ -51,6 +51,8 @@ namespace ShoBizUI
             catch (Exception ex)
             {
                 HandleException("Connect",ex);
+                MessageBox.Show(string.Format("A {0} occurred connecting to the BizTalk Database: \r\n{1}", ex.GetType(),
+                                              ex.Message),"Connection Failure",MessageBoxButtons.OK,MessageBoxIcon.Error);
                 
             }        
             finally
@@ -67,28 +69,32 @@ namespace ShoBizUI
 
         private void ckSelect_CheckedChanged(object sender, EventArgs e)
         {
-            if (ckSelect.Checked)
+            if (!ckSelect.Checked) return;
+            for (var i = 0; i < lbApps.Items.Count; i++)
             {
-                for (int i = 0; i < lbApps.Items.Count; i++)
-                {
-                    lbApps.SetSelected(i, true);
-                }
+                lbApps.SetSelected(i, true);
             }
         }
 
         private void btnBuild_Click(object sender, EventArgs e)
         {
+            status("Building documentation, please wait...");
+            if (lbApps.SelectedItems.Count == 0)
+            {
+                MessageBox.Show("Please choose one or more BizTalk applications you wish to document first.",
+                                "ShoBiz", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
             Cursor = Cursors.WaitCursor;
             try
             {
                 BuildApps();
-                //BuildDelegate bd = BuildApps;
-                //bd.BeginInvoke(null, null);
             }
             catch (Exception ex)
             {
                 HandleException("Build", ex);
-                throw;
+                MessageBox.Show(ex.GetType() + ": " + ex.Message + "\r\n\r\n" + ex.StackTrace, "Build error",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -102,7 +108,6 @@ namespace ShoBizUI
             var apps = new List<string>();
             try
             {
-                status("Building documentation, please wait...");
                 
                 //build the directory path, if it doesn't exist
                 if (!Directory.Exists(tbBaseFolder.Text))
@@ -113,17 +118,9 @@ namespace ShoBizUI
                     apps.Add(lbApps.Items[i] as string);
                 }
 
-                //the trailing character is important
-                var s = tbBaseFolder.Text.Trim() + @"\";
 
-                CatalogExplorerFactory.CatalogExplorer(tbConnectionString.Text.Trim(), true);
-
-                var at = new AppsTopic(s, s + @"images\", apps, tbRules.Text);
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!at.ReadyToSave);
-
+                //CatalogExplorerFactory.CatalogExplorer(tbConnectionString.Text.Trim(), bool.TrueString);
+                var at = new AppsTopic(tbBaseFolder.Text.Trim(), Path.Combine(tbBaseFolder.Text.Trim(), "images"), apps, tbRules.Text);
                 at.Save();
 
                 status("Build complete. Please check your build directory for your project.");
@@ -167,13 +164,10 @@ namespace ShoBizUI
             _Connection con = null;
 
             con = (_Connection)dlDlg.PromptNew();
-            if (con != null)
-            {
-                var str = con.ConnectionString;
-                if (!str.Contains(MULTI)) str = str + MULTI;
-                tbConnectionString.Text = str;
-            }
-
+            if (con == null) return;
+            var str = con.ConnectionString;
+            if (!str.Contains(MULTI)) str = str + MULTI;
+            tbConnectionString.Text = str;
         }
     }
 }

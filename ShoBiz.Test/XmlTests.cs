@@ -94,7 +94,7 @@ namespace ShoBiz.Test
                 const string projectFile = baseDirectory + "ShoBizProject.shfbproj";
                 const string tokenFile = baseDirectory + "ShoBizTokens.tokens";
                 const string rulesDb = "BizTalkRuleEngineDb";
-                CatalogExplorerFactory.CatalogExplorer(connStr, true);
+                //CatalogExplorerFactory.CatalogExplorer(connStr, true);
 
                 //what apps do we want to document?
                 List<string> apps = new List<string>();

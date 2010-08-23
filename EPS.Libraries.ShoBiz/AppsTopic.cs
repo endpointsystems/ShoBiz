@@ -1,61 +1,64 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
+using System.IO;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
+    /// <summary>
+    /// The Sandcastle Orientation document for outlining the BizTalk applications that were documented.
+    /// </summary>
     public class AppsTopic : TopicFile
     {
-        private readonly Thread thread;
         private readonly List<string> appNames;
-        private readonly List<AppTopic> appTopics;
-        private readonly string imgPath;
+        private readonly List<AppTopic> topics;
         private XElement root;
-        private readonly string rulesDb;
         private readonly string tokenFile;
         private readonly string projectFile;
         private readonly string contentFile;
 
-        public AppsTopic(string basePath, string imagePath, List<string> btsAppNames, string businessRulesDatabaseName)
+        /// <summary>
+        /// Creates a new application topic instance.
+        /// </summary>
+        /// <param name="basePath">The path the application topics will be persisted to.</param>
+        /// <param name="imagePath">The path where all project images will be stored.</param>
+        /// <param name="btsAppNames">The list of BizTalk application names that will be documented.</param>
+        /// <param name="rulesDb">The name of the BizTalk Rules Engine database.</param>
+        public AppsTopic(string basePath, string imagePath, List<string> btsAppNames, string rulesDb)
         {
-            rulesDb = businessRulesDatabaseName;
-            path = basePath + @"Applications\";
-            tokenFile = basePath + @"ShoBizTokens.tokens";
-            projectFile = basePath + "ShoBizProject.shfbproj";
-            contentFile = basePath + "ShoBiz.content";
-            addFolder(path);
-            imgPath = imagePath;
-            addFolder(imgPath);
+            topicRelativePath = "Applications";
+            ProjectConfiguration.BasePath = basePath;
+            ProjectConfiguration.ImagesPath = imagePath;
+            ProjectConfiguration.RulesDatabase = rulesDb;
+            tokenFile = Path.Combine(basePath, "ShoBizTokens.tokens");
+            projectFile = Path.Combine(basePath, "ShoBizProject.shfbproj");
+            contentFile = Path.Combine(basePath, "ShoBiz.content");
+            addFolderToProject(topicRelativePath);
+            addFolderToProject(imagePath);
+            addFolderToFileSystem(imagePath);
             appNames = btsAppNames;
             tokenId = "Applications";
-            TimerStart();
-            thread = new Thread(BuildAppTopics);
-            thread.Name = "AppsTopicThread";
-            thread.SetApartmentState(ApartmentState.MTA);
-            appTopics = new List<AppTopic>(btsAppNames.Count);
-            thread.Start();            
+            topics = new List<AppTopic>(btsAppNames.Count);
         }
 
-        private void BuildAppTopics()
+        private void SaveTopic()
         {
-            if (null == appTopics) return;
-            foreach (string name in appNames)
+            if (null == topics) return;
+            if (string.IsNullOrEmpty(ProjectConfiguration.RulesDatabase))
+                throw new NullReferenceException("The Rules Engine Database configuration setting is null or empty.");
+            foreach (var name in appNames)
             {
-                appTopics.Add(new AppTopic(path, imgPath, name,rulesDb));
+                topics.Add(new AppTopic(topicRelativePath, name));
             }
 
-            List<XElement> paras = new List<XElement>();
-            foreach (AppTopic topic in appTopics)
+            var paras = new List<XElement>();
+            foreach (var topic in topics)
             {
                 /*
                  * Get our <inThisSection> paragraphs
                  */
                 paras.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", topic.TokenId)));
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
             }
 
             /*
@@ -70,28 +73,22 @@ namespace EndpointSystems.BizTalk.Documentation
                                     new XText("This section documents the following BizTalk applications:"),
                                     paras.ToArray()));
             if (doc.Root != null) doc.Root.Add(root);
-            lock (this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
         }
 
+        /// <summary>
+        /// Get the Sandcastle content layout for the topic.
+        /// </summary>
+        /// <returns>An <see cref="XElement"/> containing the content layout information.</returns>
         public XElement GetContentLayout()
         {
-            XElement xe = new XElement("Topic",
+            var xe = new XElement("Topic",
                                        new XAttribute("id", id),
                                        new XAttribute("visible", true),
                                        new XAttribute("title", "BizTalk Applications"));
             try
             {
-                foreach (AppTopic topic in appTopics)
+                foreach (var topic in topics)
                 {
-                    do
-                    {
-                        Thread.Sleep(100);
-                    } while (!topic.ReadyToSave);
-
                     //get the child topics for the ContentFile
                     xe.Add(topic.GetContentLayout());
                 }
@@ -105,18 +102,29 @@ namespace EndpointSystems.BizTalk.Documentation
             return xe;
         }
 
-        public new void Save()
+        /// <summary>
+        /// Save the applications topic, all subsequent child topics; also saves the Sandcastle content, 
+        /// token and project files.
+        /// </summary>
+        public override void Save()
         {
-            base.Save();
-            foreach (AppTopic topic in appTopics)
+            TimerStart();
+            SaveTopic();
+            
+            foreach (var topic in topics)
             {
-                topic.Save();
+                if (topic != null) topic.Save();
             }
 
+            //loopResult = Parallel.ForEach(topics, SaveAllTopics);
+            base.Save();
             //save content file and add to the project
             ContentFile.GetContentFile().AddApplicationTopic(GetContentLayout());
             ContentFile.GetContentFile().Save(contentFile);
             ProjectFile.GetProjectFile().AddContentLayoutFile(contentFile);
+
+            OrchestrationImage.Instance().StartSavingImages();
+            OrchestrationImage.Instance().CancelToken.Cancel();
 
             //save token file and add to the project
             TokenFile.GetTokenFile().Save(tokenFile);
@@ -125,6 +133,7 @@ namespace EndpointSystems.BizTalk.Documentation
             //save the project file
             ProjectFile.GetProjectFile().Save(projectFile);
 
+            TimerStop();
         }
 
     }

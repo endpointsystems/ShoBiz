@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Threading;
+using System.IO;
 using System.Xml.Linq;
 using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
@@ -31,8 +30,6 @@ namespace EndpointSystems.BizTalk.Documentation
     /// </remarks>
     public class AppTopic : TopicFile
     {
-        private readonly BackgroundWorker appWorker;
-        private readonly string imgPath;
         private OrchestrationsTopic orchsTopic;
         private ReceivePortsTopic rpsTopic;
         private SendPortsTopic spsTopic;
@@ -41,126 +38,83 @@ namespace EndpointSystems.BizTalk.Documentation
         private AssembliesTopic assyTopic;
         private TransformsTopic transTopic;
         private BusinessRulesTopic bsTopic;
-        private readonly string rulesDb;
-        public AppTopic(string basePath,string btsImgPath, string btsAppName, string rulesDatabaseName)
+        private readonly List<TopicFile> topics;
+        /// <summary>
+        /// Creates a new Sandcastle topic for a BizTalk application.
+        /// </summary>
+        /// <param name="topicPath">The base path for the application topic.</param>
+        /// <param name="btsAppName">The BizTalk application name.</param>
+        public AppTopic(string topicPath, string btsAppName)
         {
-            rulesDb = rulesDatabaseName;
             appName = btsAppName;
-            path = basePath + appName + @"\";
-            imgPath = btsImgPath;
+            topicRelativePath = Path.Combine(topicPath, appName);
             buildTree();
             tokenId = CleanAndPrep(btsAppName);
-            TimerStart();
+            topics = new List<TopicFile>();
             TokenFile.GetTokenFile().AddTopicToken(CleanAndPrep(tokenId), id);
-            appWorker = new BackgroundWorker();
-            appWorker.DoWork += appWorker_DoWork;
-            appWorker.RunWorkerCompleted += appWorker_RunWorkerCompleted;
-            appWorker.RunWorkerAsync();
         }
         /// <summary>
         /// Build the directory tree for the app.
         /// </summary>
         private void buildTree()
         {
-            addFolder(path);
-            addFolder(path + @"Orchestrations\");
-            addFolder(path + @"Send Ports\");
-            addFolder(path + @"Receive Ports\");
-            addFolder(path + @"Receive Locations\");
-            addFolder(path + @"Policies\");
-            addFolder(path + @"Schemas\");
-            addFolder(path + @"Maps\");
-            addFolder(path + @"Pipelines\");
-            addFolder(path + @"Resources\");
+            addFolderToProject(topicRelativePath);
+            addFolderToProject(Path.Combine(topicRelativePath, "Orchestrations"));
+            addFolderToProject(Path.Combine(topicRelativePath, "Receive Ports"));
+            addFolderToProject(Path.Combine(topicRelativePath, "Receive Locations"));
+            addFolderToProject(Path.Combine(topicRelativePath, "Policies"));
+            addFolderToProject(Path.Combine(topicRelativePath, "Schemas"));
+            addFolderToProject(Path.Combine(topicRelativePath, "Maps"));
+            addFolderToProject(Path.Combine(topicRelativePath, "Pipelines"));
+            addFolderToProject(Path.Combine(topicRelativePath, "Resources"));
+
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Orchestrations"));
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Receive Ports"));
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Receive Locations"));
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Policies"));
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Schemas"));
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Maps"));
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Pipelines"));
+            addFolderToFileSystem(Path.Combine(Path.Combine(ProjectConfiguration.BasePath, topicRelativePath), "Resources"));
         }
 
-        private void appWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void SaveTopic()
         {
-            if (orchsTopic != null)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!orchsTopic.ReadyToSave);
-            }
+            var app = CatalogExplorerFactory.CatalogExplorer().Applications[appName];
+            var root = CreateDeveloperOrientationElement();
+            var intro = new XElement(xmlns + "introduction", 
+                new XElement(xmlns + "para", new XText(string.IsNullOrEmpty(app.Description) 
+                    ? "No description was given." 
+                    : app.Description)));
+            var inThis = new XElement(xmlns + "inThisSection", 
+                new XText("This application contains the BizTalk artifacts listed below."));
 
-            if (spsTopic != null)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!spsTopic.ReadyToSave);
-            }
-
-            if (rpsTopic != null)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!rpsTopic.ReadyToSave);
-            }
-
-            if (rlsTopic != null)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!rlsTopic.ReadyToSave);
-            }
-
-            if (bsTopic != null)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!bsTopic.ReadyToSave);
-            }
-
-            if (schTopic != null)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!schTopic.ReadyToSave);
-            }
-
-            lock (this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        private void appWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
-            bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
-            Application app = bce.Applications[appName];
-            XElement root = CreateDeveloperOrientationElement();
-            XElement intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText(string.IsNullOrEmpty(app.Description) ? "No description was given." : app.Description)));
-            XElement inThis = new XElement(xmlns + "inThisSection", new XText("This application contains the BizTalk artifacts listed below."));
             #region orchestrations
             try
             {
                 if (null != app.Orchestrations)
                 {
-                    PrintLine("{0} has {1} orchestrations", appName, app.Orchestrations.Count);
                     if (app.Orchestrations.Count > 0)
                     {
+                        PrintLine("{0} orchestrations count: {1}", appName, app.Orchestrations.Count);
+                        var olist = new List<string>();
                         inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Orchestrations:"))));
                         foreach (BtsOrchestration orch in app.Orchestrations)
                         {
+                            olist.Add(orch.FullName);
                             inThis.Add(new XElement(xmlns + "para",
                                                     new XElement(xmlns + "token",
                                                                  new XText(CleanAndPrep(appName + ".Orchestrations." + orch.FullName)))));
                         }
-                        orchsTopic = new OrchestrationsTopic(path + @"Orchestrations\", imgPath, appName);
+                        PrintLine("creating orchestrations topic for {0}", appName);
+                        orchsTopic = new OrchestrationsTopic(Path.Combine(topicRelativePath, "Orchestrations"), app.Name, olist.ToArray());
                     }
+                    topics.Add(orchsTopic);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                HandleException("BtsAppTopic.DoWork(orchestrations)",ex);
+                HandleException("BtsAppTopic.DoWork(orchestrations)", ex);
             }
             #endregion
 
@@ -171,21 +125,25 @@ namespace EndpointSystems.BizTalk.Documentation
                 if (app.SendPorts != null)
                 {
                     PrintLine("send ports count: {0}", app.SendPorts.Count);
+                    var ports = new List<string>();
                     if (app.SendPorts.Count > 0)
                     {
-                        inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Send Ports:"))));
+                        inThis.Add(new XElement(xmlns + "para", 
+                            new XElement(xmlns + "legacyBold", new XText("Send Ports:"))));
                         foreach (SendPort port in app.SendPorts)
                         {
                             inThis.Add(new XElement(xmlns + "para",
                                                     new XElement(xmlns + "token",
                                                                  new XText(CleanAndPrep(appName + ".SendPorts." + port.Name)))));
+                            ports.Add(port.Name);
                         }
-
-                        spsTopic = new SendPortsTopic(appName, path + @"Send Ports\");
+                        PrintLine("creating send ports topic for {0}", appName);
+                        spsTopic = new SendPortsTopic(appName, Path.Combine(topicRelativePath, "Send Ports"), ports.ToArray());
                     }
+                    topics.Add(spsTopic);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 HandleException("BtsAppTopic.DoWork(send ports)", ex);
             }
@@ -198,31 +156,51 @@ namespace EndpointSystems.BizTalk.Documentation
                 if (app.ReceivePorts.Count > 0)
                 {
                     PrintLine("{0} has {1} receive ports", appName, app.ReceivePorts.Count);
-                    XElement rlElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Locations:")));
-                    List<XElement> recLocs = new List<XElement>();
+                    var rlElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Locations:")));
+                    var recLocs = new List<XElement>();
 
-                    XElement rpElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Ports:")));
+                    var rpElement = new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Receive Ports:")));
+
+                    var jarPorts = new string[app.ReceivePorts.Count][];
+
+                    //iterate through the receive ports for the array
+                    var jagIterator = 0;
+                    var receivePortIterator = 0;
+                    var receivePorts = new string[app.ReceivePorts.Count];
                     foreach (ReceivePort port in app.ReceivePorts)
                     {
+                        //collect the receive port name
+                        receivePorts[receivePortIterator] = port.Name;
+                        receivePortIterator++;
+
                         PrintLine("{0} has {1} receive locations");
                         rpElement.Add(new XElement(xmlns + "para",
                                                 new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".ReceivePorts." + port.Name)))));
                         if (port.ReceiveLocations.Count > 0)
                         {
-                            foreach (ReceiveLocation rl in port.ReceiveLocations)
+                            jarPorts[jagIterator] = new string[port.ReceiveLocations.Count];
+                            for (var j = 0; j < port.ReceiveLocations.Count; j++)
                             {
+                                jarPorts[jagIterator][j] = port.ReceiveLocations[j].Name;
                                 recLocs.Add(new XElement(xmlns + "para",
                                                          new XElement(xmlns + "token",
-                                                                      new XText(CleanAndPrep(appName + ".ReceiveLocations." + rl.ReceivePort.Name + rl.Name)))));
+                                                                      new XText(CleanAndPrep(appName + ".ReceiveLocations." + port.ReceiveLocations[j].ReceivePort.Name + port.ReceiveLocations[j].Name)))));
                             }
+                            jagIterator++;
+
                             if (null == rlsTopic)
                             {
-                                rlsTopic = new ReceiveLocationsTopic(appName, path + @"Receive Locations\");
+                                PrintLine("creating receive locations topic for {0}", appName);
+                                rlsTopic = new ReceiveLocationsTopic(appName, Path.Combine(topicRelativePath, "Receive Locations"), jarPorts);
                             }
-                        }
-                        rpsTopic = new ReceivePortsTopic(appName, path + @"Receive Ports\");
-                    }
 
+                            topics.Add(rlsTopic);
+                        }
+
+                        PrintLine("creating receive ports topic for {0}", appName);
+                        rpsTopic = new ReceivePortsTopic(appName, Path.Combine(topicRelativePath, "Receive Ports"), receivePorts);
+                        topics.Add(rpsTopic);
+                    }
                     inThis.Add(rpElement);
 
                     if (recLocs.Count > 0)
@@ -242,17 +220,26 @@ namespace EndpointSystems.BizTalk.Documentation
                 if (app.Policies.Count > 0)
                 {
                     PrintLine("{0} has {1} policies", appName, app.Policies.Count);
-                    bsTopic = new BusinessRulesTopic(appName, path + @"Policies\", rulesDb);
+                    if (string.IsNullOrEmpty(ProjectConfiguration.RulesDatabase))
+                        throw new NullReferenceException("The Rules Engine Database configuration setting is null or empty.");
                     inThis.Add(new XElement(xmlns + "legacyBold", new XText("Policies:")));
+
+                    var rules = new string[app.Policies.Count];
+                    var rulesIterator = 0;
                     foreach (Policy policy in app.Policies)
                     {
+                        rules[rulesIterator] = policy.Name;
+                        rulesIterator++;
                         inThis.Add(new XElement(xmlns + "para",
                                                 new XElement(xmlns + "token",
                                                              new XText(
                                                                  CleanAndPrep(appName + ".Policies." + policy.Name)))));
                     }
 
+                    PrintLine("creating business rules topic for {0}", appName);
+                    bsTopic = new BusinessRulesTopic(appName, Path.Combine(topicRelativePath, "Policies"), rules);
                 }
+                topics.Add(bsTopic);
             }
 
             #endregion
@@ -263,12 +250,20 @@ namespace EndpointSystems.BizTalk.Documentation
                 if (app.Schemas.Count > 0)
                 {
                     PrintLine("{0} has {1} schemas", appName, app.Schemas.Count);
-                    schTopic = new SchemasTopic(appName, path + @"Schemas\");
+                    var schemaNames = new string[app.Schemas.Count];
+                    for (var i = 0; i < app.Schemas.Count; i++)
+                    {
+                        schemaNames[i] = app.Schemas[i].FullName + "___" + app.Schemas[i].RootName;
+                    }
+
+                    PrintLine("Creating schemas topic for {0}...", appName);
+                    schTopic = new SchemasTopic(appName, Path.Combine(topicRelativePath, "Schemas"), schemaNames);
+                    topics.Add(schTopic);
                     inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Schemas:"))));
 
-                    foreach (Schema schema in app.Schemas)
+                    foreach (var name in schemaNames)
                     {
-                        inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Schemas." + schema.FullName)))));
+                        inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Schemas." + name)))));
                     }
                 }
             }
@@ -281,6 +276,13 @@ namespace EndpointSystems.BizTalk.Documentation
                 if (app.Transforms.Count > 0)
                 {
                     PrintLine("{0} has {1} transforms", appName, app.Transforms.Count);
+                    var mapNames = new string[app.Transforms.Count];
+
+                    for (var i = 0; i < app.Transforms.Count; i++)
+                    {
+                        mapNames[i] = app.Transforms[i].FullName;
+                    }
+
                     inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Transforms:"))));
                     foreach (Transform transform in app.Transforms)
                     {
@@ -289,12 +291,14 @@ namespace EndpointSystems.BizTalk.Documentation
                                                              new XText(CleanAndPrep(appName + ".Transforms." + transform.FullName)))));
                     }
 
-                    transTopic = new TransformsTopic(appName, path + @"Maps\");
+                    PrintLine("creating transforms (maps) topic for {0}", appName);
+                    transTopic = new TransformsTopic(appName, Path.Combine(topicRelativePath, "Maps"), mapNames);
+                    topics.Add(transTopic);
                 }
-                
             }
             #endregion
 
+            //TODO: Is there no pipeline topic(s)?
             #region pipelines
             if (null != app.Pipelines)
             {
@@ -308,6 +312,7 @@ namespace EndpointSystems.BizTalk.Documentation
                                                 new XElement(xmlns + "token",
                                                              new XText(CleanAndPrep(appName + ".Pipelines." + pipeline.FullName)))));
                     }
+
                 }
             }
 
@@ -319,12 +324,19 @@ namespace EndpointSystems.BizTalk.Documentation
                 if (app.Assemblies.Count > 0)
                 {
                     PrintLine("{0} has {1} assemblies", appName, app.Assemblies.Count);
-                    assyTopic = new AssembliesTopic(path + @"Resources\", appName);
                     inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "legacyBold", new XText("Resources:"))));
+                    var assys = new string[app.Assemblies.Count];
+                    var assyIterator = 0;
                     foreach (BtsAssembly assembly in app.Assemblies)
                     {
+                        assys[assyIterator] = assembly.Name;
+                        assyIterator++;
                         inThis.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Assemblies." + assembly.Name)))));
                     }
+
+                    PrintLine("creating assemblies topic for {0}", appName);
+                    assyTopic = new AssembliesTopic(Path.Combine(topicRelativePath, "Resources"), appName, assys);
+                    topics.Add(assyTopic);
                 }
             }
             #endregion
@@ -333,102 +345,77 @@ namespace EndpointSystems.BizTalk.Documentation
             if (doc.Root != null) doc.Root.Add(root);
         }
 
-        public new void Save()
+        /// <summary>
+        /// Save the topic and all sub-topics.
+        /// </summary>
+        public override void Save()
         {
-            do
+            TimerStart();
+            SaveTopic();
+            foreach (var file in topics)
             {
-                Thread.Sleep(100);
-            } while (ReadyToSave == false);
+                if (file == null) continue;
+
+                if (file is SchemasTopic)
+                    PrintLine("saving schemas topic!");
+
+                file.Save();
+            }
+
+            //var opts = new ParallelOptions {MaxDegreeOfParallelism = -1, TaskScheduler = null};
+            //loopResult = Parallel.ForEach(topics, opts, SaveAllTopics);
+
             base.Save();
-            if (null != orchsTopic)     orchsTopic.Save();
-            if (null != rpsTopic)       rpsTopic.Save();
-            if (null != rlsTopic)       rlsTopic.Save();
-            if (null != bsTopic)        bsTopic.Save();
-            if (null != spsTopic)       spsTopic.Save();
-            if (null != schTopic)       schTopic.Save();
-            if (null != assyTopic)      assyTopic.Save();
-            if (null != transTopic)     transTopic.Save();
+            TimerStop();
         }
 
+        /// <summary>
+        /// Get the Sandcastle content layout for the topic.
+        /// </summary>
+        /// <returns>An <see cref="XElement"/> containing the content layout information.</returns>
         public XElement GetContentLayout()
         {
-            XElement xe = new XElement("Topic",
+            var xe = new XElement("Topic",
                                 new XAttribute("id", id),
                                 new XAttribute("visible", true),
                                 new XAttribute("title", appName));
             if (null != orchsTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!orchsTopic.ReadyToSave);
                 xe.Add(orchsTopic.GetContentLayout());
             }
-            
+
             if (null != spsTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!spsTopic.ReadyToSave);
-
                 xe.Add(spsTopic.GetContentLayout());
             }
 
             if (null != rpsTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);                    
-                } while (!rpsTopic.ReadyToSave);
                 xe.Add(rpsTopic.GetContentLayout());
             }
 
             if (null != rlsTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!rlsTopic.ReadyToSave);
-
                 xe.Add(rlsTopic.GetContentLayout());
             }
 
             if (null != bsTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!bsTopic.ReadyToSave);
                 xe.Add(bsTopic.GetContentLayout());
             }
 
             if (null != schTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!schTopic.ReadyToSave);
                 xe.Add(schTopic.GetContentLayout());
             }
 
             if (null != transTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!transTopic.ReadyToSave);
-
                 xe.Add(transTopic.GetContentLayout());
             }
 
             if (null != assyTopic)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!assyTopic.ReadyToSave);
-
                 xe.Add(assyTopic.GetContentLayout());
             }
             return xe;

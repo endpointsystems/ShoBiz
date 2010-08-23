@@ -1,76 +1,47 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Threading;
 using System.Xml.Linq;
-using EndpointSystems.OrchestrationLibrary;
-using Microsoft.BizTalk.ExplorerOM;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
-    class TransformsTopic : TopicFile, IDisposable
+    class TransformsTopic : TopicFile
     {
-        private readonly BackgroundWorker transWorker;
         private readonly List<TransformTopic> topics;
         private XElement root;
-        public TransformsTopic(string btsAppName, string basePath)
+        private readonly string[] maps;
+
+        /// <summary>
+        /// Creates a new Sandcastle document for a BizTalk map artifact (transform).
+        /// </summary>
+        /// <param name="btsAppName">The BizTalk application name.</param>
+        /// <param name="topicPath">The path to save the topic.</param>
+        /// <param name="transforms">The full name of the BizTalk transforms to save.</param>
+        public TransformsTopic(string btsAppName, string topicPath, string[] transforms)
         {
-            path = basePath;
+            maps = transforms;
+            topicRelativePath = topicPath;
             appName = btsAppName;
             tokenId = CleanAndPrep(btsAppName + ".Transforms");
-            TimerStart();
             TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
             topics = new List<TransformTopic>();
-            transWorker = new BackgroundWorker();
-            transWorker.DoWork += schWorker_DoWork;
-            transWorker.RunWorkerCompleted += schWorker_RunWorkerCompleted;
-            transWorker.RunWorkerAsync();
+            UsingParallel = true;
         }
 
-        public void Dispose()
+        void SaveTopic()
         {
-            if (null != topics)
-            {
-                foreach (TransformTopic topic in topics)
-                {
-                    topic.Dispose();
-                }
-            }
-            if (null != transWorker) transWorker.Dispose();
-        }
-
-        void schWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            foreach (TransformTopic topic in topics)
-            {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
-            }
-            lock (this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        void schWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
             try
             {
-                List<XElement> elems = new List<XElement>();
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
+                var elems = new List<XElement>();
                 root = CreateDeveloperOrientationElement();
-                XElement intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText("This section outlines the maps contained in this BizTalk application.")));
-                foreach (Transform trans in bce.Applications[appName].Transforms)
+                var intro = new XElement(xmlns + "introduction", new XElement(xmlns + "para", new XText("This section outlines the maps contained in this BizTalk application.")));
+                foreach (var name in maps)
                 {
-                    elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Transforms." + trans.FullName)))));
-                    topics.Add(new TransformTopic(appName, path, trans.FullName));
+                    elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(appName + ".Transforms." + name)))));
+                    PrintLine("creating new TransformTopic for {0}", name);
+                    topics.Add(new TransformTopic(appName, topicRelativePath, name));
                 }
 
-                XElement inThis = new XElement(xmlns + "inThisSection", new XText("This application contains the following transforms:"));
+                var inThis = new XElement(xmlns + "inThisSection", new XText("This application contains the following transforms:"));
 
                 inThis.Add(elems.ToArray());
                 root.Add(intro, inThis);
@@ -80,21 +51,21 @@ namespace EndpointSystems.BizTalk.Documentation
             {
                 HandleException("TransformsTopic.DoWork", ex);
             }
-            finally
-            {
-                bce.Dispose();
-            }
         }
 
+        /// <summary>
+        /// Get the Sandcastle content layout for the topic.
+        /// </summary>
+        /// <returns>An <see cref="XElement"/> containing the content layout information.</returns>
         public XElement GetContentLayout()
         {
-            List<XElement> t = new List<XElement>();
-            foreach (TransformTopic topic in topics)
+            var t = new List<XElement>();
+            foreach (var topic in topics)
             {
                 t.Add(topic.GetContentLayout());
             }
 
-            XElement xe = new XElement("Topic",
+            var xe = new XElement("Topic",
                                 new XAttribute("id", id),
                                 new XAttribute("visible", "true"),
                                 new XAttribute("title", "Transforms"));
@@ -103,17 +74,17 @@ namespace EndpointSystems.BizTalk.Documentation
             return xe;
         }
 
-        public new void Save()
+        public override void Save()
         {
-            base.Save();
-            foreach (TransformTopic topic in topics)
+            TimerStart();
+            SaveTopic();
+            //loopResult = Parallel.ForEach(topics, SaveAllTopics);
+            foreach (var topic in topics)
             {
-                do
-                {
-                    Thread.Sleep(100);
-                } while (!topic.ReadyToSave);
                 topic.Save();
             }
+            base.Save();
+            TimerStop();
         }
     }
 }

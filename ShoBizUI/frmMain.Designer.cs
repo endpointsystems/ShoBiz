@@ -54,6 +54,7 @@ namespace ShoBizUI
             this.label1.Size = new System.Drawing.Size(141, 36);
             this.label1.TabIndex = 0;
             this.label1.Text = "BizTalk Server database connection string:";
+            this.label1.Visible = false;
             // 
             // tbConnectionString
             // 
@@ -61,6 +62,7 @@ namespace ShoBizUI
             this.tbConnectionString.Name = "tbConnectionString";
             this.tbConnectionString.Size = new System.Drawing.Size(245, 20);
             this.tbConnectionString.TabIndex = 0;
+            this.tbConnectionString.Visible = false;
             // 
             // statusStrip1
             // 
@@ -75,7 +77,7 @@ namespace ShoBizUI
             // lblStatus
             // 
             this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(384, 17);
+            this.lblStatus.Size = new System.Drawing.Size(348, 17);
             this.lblStatus.Text = "Press the \'Connect\' button to connect to your Biztalk connection string.";
             // 
             // fdProjectPath
@@ -184,6 +186,7 @@ namespace ShoBizUI
             this.btnConnectString.TabIndex = 9;
             this.btnConnectString.Text = "...";
             this.btnConnectString.UseVisualStyleBackColor = true;
+            this.btnConnectString.Visible = false;
             this.btnConnectString.Click += new System.EventHandler(this.btnConnectString_Click);
             // 
             // frmMain

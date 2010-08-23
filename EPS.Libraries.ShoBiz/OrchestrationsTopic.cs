@@ -1,82 +1,57 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
-using EndpointSystems.OrchestrationLibrary;
 using Microsoft.BizTalk.ExplorerOM;
 
 namespace EndpointSystems.BizTalk.Documentation
 {
     /// <summary>
-    /// Orientation page leading to the orchestration topic files.
+    /// Sandcastle Orientation page leading to the orchestration topic files.
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
     /// <item>token id: application name + ".Orchestrations"</item>
     ///  </list>
     /// </remarks>
-    public class OrchestrationsTopic : TopicFile, IDisposable
+    public class OrchestrationsTopic : TopicFile
     {
-        private readonly BackgroundWorker orchWorker;
         private readonly List<OrchestrationTopic> topics;
-        private readonly string imagesPath;
-
-        public OrchestrationsTopic(string basePath, string btsImagesPath, string btsAppName)
+        private readonly string[] orchNames;
+        /// <summary>
+        /// Creates a new instance of the <see cref="OrchestrationsTopic"/> class.
+        /// </summary>
+        /// <param name="topicPath">The base path of the Orchestrations documentation folder.</param>
+        /// <param name="btsAppName">The BizTalk application name.</param>
+        /// <param name="orchestrationNames">The <see cref="BtsOrchestration.FullName"/> of all of the orchestrations.</param>
+        public OrchestrationsTopic(string topicPath, string btsAppName, string[] orchestrationNames)
         {
             try
             {
                 topics = new List<OrchestrationTopic>();
-                path = basePath;
+                orchNames = orchestrationNames;
+                topicRelativePath = topicPath;
                 appName = btsAppName;
-                imagesPath = btsImagesPath;
                 tokenId = CleanAndPrep(appName + ".Orchestrations");
-                TimerStart();
                 //add token
                 TokenFile.GetTokenFile().AddTopicToken(tokenId, id);
-                ReadyToSave = false;
-                PrintLine("[OrchestrationsTopic] initializing worker thread...");
-                orchWorker = new BackgroundWorker();
-                
-                orchWorker.DoWork += orchWorker_DoWork;
-                orchWorker.RunWorkerCompleted += orchWorker_RunWorkerCompleted;
-                PrintLine("[OrchestrationsTopic] starting worker...");
-                
-                orchWorker.RunWorkerAsync();
+                ReadyToSave = false;                
             }
             catch(Exception ex)
             {
                 HandleException("OrchestrationsTopic constructor",ex);
             }
         }
-
-
-        private void orchWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        
+        private void BuildTopic()
         {
-            foreach (OrchestrationTopic topic in topics)
-            {
-                do
-                {
-                    Thread.Sleep(2000);
-                } while (topic.ReadyToSave == false);
-            }
-            lock(this)
-            {
-                ReadyToSave = true;
-            }
-            TimerStop();
-        }
-
-        private void orchWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BtsCatalogExplorer bce = new BtsCatalogExplorer();
+            //var bce = new BtsCatalogExplorer();
             try
             {
-                bce.ConnectionString = CatalogExplorerFactory.CatalogExplorer().ConnectionString;
                 PrintLine("doing orchestration work");
 
                 //build topic
-                XElement root = CreateDeveloperOrientationElement();
+                var root = CreateDeveloperOrientationElement();
                 root.Add(new XElement(xmlns + "introduction",
                                       new XElement(xmlns + "para",
                                                    new XText(
@@ -84,43 +59,48 @@ namespace EndpointSystems.BizTalk.Documentation
                                                            "This section contains information about the orchestrations used in the {0} application.",
                                                            appName)))));
                 
-                XElement thisSection = new XElement(xmlns + "inThisSection");
+                var thisSection = new XElement(xmlns + "inThisSection");
                 
-                List<XElement> elems = new List<XElement>();
+                var elems = new List<XElement>();
 
-                foreach (
-                    BtsOrchestration orch in
-                        bce.Applications[appName].Orchestrations)
+                foreach ( var name in orchNames)
                 {
-                    topics.Add(new OrchestrationTopic(path, imagesPath, appName, orch.FullName));
-                    elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", new XText(CleanAndPrep(string.Format("{0}.Orchestrations.{1}",appName,orch.FullName))))));
-                    Thread.Sleep(5000);
-                }
+                    var t = new OrchestrationTopic(topicRelativePath, appName, name);                    
+                    topics.Add(t);
 
+                    elems.Add(new XElement(xmlns + "para", new XElement(xmlns + "token", 
+                        new XText(CleanAndPrep(string.Format("{0}.Orchestrations.{1}",appName,name))))));
+                }
+                
+                //add the orchestration links to the documentation
                 thisSection.Add(new XText("This application contains the following orchestrations:"),
                                 elems.ToArray());
+
+                //attach section to the root
                 root.Add(thisSection);
+                
+                //add to the document root
                 if (doc.Root != null) doc.Root.Add(root);
             }
             catch(Exception ex)
             {
                 PrintLine("[OrchestrationsTopic.DoWork] {0}: {1}",ex.GetType(),ex.Message);
             }
-            finally
-            {
-                bce.Dispose();
-            }
         }
-        
+
+        /// <summary>
+        /// Get the Sandcastle content layout for the topic.
+        /// </summary>
+        /// <returns>An <see cref="XElement"/> containing the content layout information.</returns>
         public XElement GetContentLayout()
         {
-            List<XElement> t = new List<XElement>();            
-            foreach (OrchestrationTopic topic in topics)
+            var t = new List<XElement>();            
+            foreach (var topic in topics)
             {
                t.Add(topic.GetContentLayout());
             }
 
-            XElement xe = new XElement("Topic",
+            var xe = new XElement("Topic",
                                 new XAttribute("id", id),
                                 new XAttribute("visible", "true"),
                                 new XAttribute("title", "Orchestrations"));
@@ -129,18 +109,20 @@ namespace EndpointSystems.BizTalk.Documentation
             return xe;
         }
 
-        public new void Save()
+        /// <summary>
+        /// Save the topic.
+        /// </summary>
+        public override void Save()
         {
-            base.Save();
-            foreach (OrchestrationTopic topic in topics)
+            TimerStart();
+            BuildTopic();
+            foreach (var topic in topics)
             {
                 topic.Save();
             }
-        }
-
-        public void Dispose()
-        {
-            orchWorker.Dispose();
+            //loopResult = Parallel.ForEach(topics, SaveAllTopics);
+            base.Save();
+            TimerStop();
         }
     }
 }
