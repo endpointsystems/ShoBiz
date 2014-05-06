@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<CodeSnippets xmlns="http://schemas.microsoft.com/VisualStudio/2005/CodeSnippet">
+	<CodeSnippet Format="1.0.0">
+		<Header>
+			<Author>Lucas R. Vogel</Author>
+			<Description>constructor for an object that inherits from BtsBaseComponent and employs use of the XmlReader object.</Description>
+			<Keywords>
+				<Keyword>BtsObject</Keyword>
+				<Keyword>XmlReader</Keyword>
+			</Keywords>
+			<Shortcut>btor</Shortcut>
+			<SnippetTypes>
+				<SnippetType>Expansion</SnippetType>
+				
+			</SnippetTypes>
+		</Header>
+		<Snippet>
+			<Declarations>
+				<Literal Editable="false">
+					<ID>classname</ID>
+					<Function>ClassName()</Function>
+					<Default>classname</Default>
+				</Literal>
+			</Declarations>
+			<Code Language="CSharp">
+						 <![CDATA[
+	  public $classname$(XmlReader reader) : base(reader)
+	  {
+	   while (reader.Read())
+		{
+		 if (!reader.HasAttributes)
+			break;
+		 else if (reader.Name.Equals("om:Property"))
+			{
+		     string valName = reader.GetAttribute("Name");
+		     string val = reader.GetAttribute("Value");
+			if (!base.GetReaderProperties(valName,val))
+			  {
+			   if (valName.Equals(""))
+					_this = val;
+				else
+					{
+					 Debug.WriteLine("[$classname$.ctor] unhandled property " + valName);
+					Debugger.Break();
+					 }
+			   }
+			}
+		else if (reader.Name.Equals("om:Element"))
+			   {
+				Debug.WriteLine("[$classname$.ctor] unhandled element " + reader.GetAttribute("Value"));
+				Debugger.Break();
+				}			
+		 }
+		  reader.Close();
+	   }
+									 ]]>
+					 </Code>
+	  </Snippet>
+	</CodeSnippet>
+</CodeSnippets>

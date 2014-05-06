@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<developerOrientationDocument xmlns:xlink="http://www.w3.org/1999/xlink">
+  http://ddue.schemas.microsoft.com/authoring/2003/5http://ddue.schemas.microsoft.com/authoring/2003/5<introduction>
+    <para>This section contains documentation for all of the selected BizTalk applications. For more information on any of the applications, please select one of the links below.</para>
+  </introduction><inThisSection>
+    This section documents the following BizTalk applications:<para>
+      <token />
+    </para>
+  </inThisSection>
+</developerOrientationDocument>
